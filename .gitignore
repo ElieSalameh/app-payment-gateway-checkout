@@ -1,0 +1,51 @@
+# Visual Studio
+.vs/
+*.user
+*.suo
+*.userosscache
+*.sln.docstates
+
+# Build output
+[Bb]in/
+[Oo]bj/
+
+# Test results
+TestResults/
+[Tt]est[Rr]esult*/
+*.trx
+
+# NuGet
+*.nupkg
+*.snupkg
+.nuget/
+packages/
+
+# ASP.NET Core development settings
+appsettings.Development.json
+appsettings.*.Development.json
+
+# Logs and local data
+*.log
+logs/
+
+# Code coverage
+coverage/
+
+# OS-generated files
+.DS_Store
+Thumbs.db
+
+# Rider / ReSharper
+.idea/
+_ReSharper*/
+*.DotSettings.user
+
+# Publish output
+publish/
+
+# Local tool state
+.dotnet/
+
+# Local Copilot instructions
+.github/instructions/workflow.instructions.md
+.github/copilot-instructions.md
