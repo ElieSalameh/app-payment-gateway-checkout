@@ -11,6 +11,7 @@ Use `.github/project-context/project-scope.md` as the functional source of truth
 - Keep nullable reference types enabled. Fix nullability warnings instead of suppressing them with `!` or disabling nullable analysis.
 - Prefer clear, intention-revealing code over clever abstractions. Do not add an abstraction until it protects a boundary or is reused.
 - Follow the existing naming and formatting conventions. Use PascalCase for types and public members, camelCase for parameters and locals, and `_camelCase` for private fields.
+- Keep production code free of developer comments. Make intent clear through descriptive names for variables, methods, types, and parameters, plus small focused methods and straightforward control flow.
 - Keep public APIs small. Make types and members `internal` unless they are part of a deliberate application or library contract.
 - Prefer immutable data. Use `record` types for value-like request, response, and message models when appropriate.
 - Use guard clauses and validate inputs at the boundary where they enter the application.

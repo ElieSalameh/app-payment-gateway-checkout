@@ -45,3 +45,7 @@ publish/
 
 # Local tool state
 .dotnet/
+
+# Local Copilot instructions
+.github/instructions/workflow.instructions.md
+.github/copilot-instructions.md

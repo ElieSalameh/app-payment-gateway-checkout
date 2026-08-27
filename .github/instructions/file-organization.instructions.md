@@ -8,6 +8,7 @@ Use `.github/project-context/project-scope.md` as the functional source of truth
 ## File responsibilities
 
 - Keep one primary public type per file. Name the file after that type, for example `Payment.cs`, `Money.cs`, and `CreatePaymentHandler.cs`.
+- Keep production files free of developer comments. Use names such as `validatedPaymentRequest`, `paymentRepository`, `processPaymentResult`, and `GetPayment` that explain intent without requiring a comment.
 - Small private records, enums, and closely coupled implementation details may share a file when separating them would reduce readability.
 - Keep a file focused on one responsibility. Separate payment request models, handlers, validators, mappings, the repository, and the bank adapter when they have different reasons to change.
 - Do not put business logic in `Program.cs`; use it only for application composition and HTTP pipeline configuration.
@@ -74,4 +75,5 @@ PaymentGateway.Infrastructure/
 - Keep controllers limited to transport concerns. Move validation, orchestration, and business rules into the appropriate inner layer.
 - Keep mapping code explicit at boundaries. Do not allow serialization attributes or database annotations to leak into domain types without a deliberate reason.
 - Prefer composition over inheritance. Use inheritance only when substitutability and shared invariants are clear.
+- If a method needs a comment to explain what it does, first split the method, improve its names, or simplify its control flow. Keep rationale and design explanations in the Markdown documentation rather than in production-code comments.
 - Delete unused files, types, and project references rather than leaving dead alternatives in the repository.
