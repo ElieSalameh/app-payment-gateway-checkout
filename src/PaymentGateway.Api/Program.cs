@@ -1,8 +1,10 @@
 using PaymentGateway.Api.Configuration;
+using PaymentGateway.Infrastructure.Configuration;
 
 var builder = WebApplication.CreateBuilder(args);
 
 builder.Services.AddPaymentGatewayApi();
+builder.Services.AddPaymentGatewayInfrastructure();
 
 var app = builder.Build();
 

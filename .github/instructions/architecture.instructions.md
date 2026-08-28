@@ -62,7 +62,7 @@ The repository currently contains only `PaymentGateway.Api`. Grow into the struc
 
 - Map HTTP request models to application commands, and application results to HTTP response models. Never return a domain entity from a controller.
 - Do not pass `HttpContext`, `ControllerBase`, provider SDK objects, or `IConfiguration` into application or domain code. Bind typed options instead.
-- Keep the in-memory repository behind `IPaymentRepository` so it can be replaced without touching a use case.
+- Keep the in-memory repository behind `IPaymentRepository` so it can be replaced without touching a use case. The port is `Add(Payment, CancellationToken)` and `GetById(PaymentId, CancellationToken)` — it takes `PaymentId`, never a raw `Guid`, because the repository boundary is the mix-up `PaymentId` exists to prevent. `Add` throws on an id that is already stored rather than overwriting a recorded charge, and both methods honour their `CancellationToken`.
 - Treat the simulator as unreliable: bounded HTTP timeout, `503` mapped to a clear dependency failure, no false authorization or decline. Do not retry the non-idempotent payment request — a retry risks double-charging, and idempotency is not implemented.
 
 ## Feature organization

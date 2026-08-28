@@ -48,7 +48,7 @@ applyTo: "**/*.cs,**/*.csproj,**/*.props,**/*.targets"
 
 ## Dependency injection and configuration
 
-- One clear composition root: `Program.cs`, calling `AddApplication()` and `AddInfrastructure(configuration)` extension methods so it stays readable.
+- One clear composition root: `Program.cs`, calling `AddPaymentGatewayApi()` and `AddPaymentGatewayInfrastructure()` extension methods so it stays readable. Each layer registers its own types from its own `Configuration/` folder.
 - Constructor injection only. No service locator, no `IServiceProvider` in application code.
 - Choose lifetimes deliberately. The in-memory repository is a thread-safe singleton (`ConcurrentDictionary`). Scoped services must never be injected into singletons.
 - Bind configuration to typed options and validate at startup:
