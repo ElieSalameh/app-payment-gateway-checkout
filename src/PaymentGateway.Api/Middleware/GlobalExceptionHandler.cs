@@ -1,3 +1,4 @@
+using System.Text.Json;
 using FluentValidation;
 using Microsoft.AspNetCore.Diagnostics;
 using PaymentGateway.Application.Exceptions;
@@ -73,10 +74,13 @@ internal sealed class GlobalExceptionHandler : IExceptionHandler
 
     private static Dictionary<string, string[]> DescribeFailures(ValidationException exception) =>
         exception.Errors
-            .GroupBy(failure => failure.PropertyName)
+            .GroupBy(failure => ToContractFieldName(failure.PropertyName))
             .ToDictionary(
                 failures => failures.Key,
                 failures => failures.Select(failure => failure.ErrorMessage).ToArray());
+
+    private static string ToContractFieldName(string propertyName) =>
+        JsonNamingPolicy.CamelCase.ConvertName(propertyName);
 
     private void LogOutcome(Exception exception, int? status)
     {

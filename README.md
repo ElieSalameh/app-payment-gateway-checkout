@@ -223,10 +223,10 @@ Important scenarios include:
 
 ### Start the bank simulator
 
-Run the simulator from its directory with:
+Run the simulator from the repository root with:
 
 ```powershell
-docker-compose up
+docker-compose -f docker/docker-compose.yml up
 ```
 
 The simulator should be available at `http://localhost:8080`.
