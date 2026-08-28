@@ -39,14 +39,19 @@ Rationale, design decisions, and assumptions belong in `README.md` and `CLAUDE.m
 
 ```text
 src/PaymentGateway.Api/
-  Payments/
+  Controllers/
     PaymentsController.cs
-    ProcessPaymentRequest.cs
-    PaymentResponse.cs
+  Contracts/
+    Requests/
+      ProcessPaymentRequest.cs
+    Responses/
+      PaymentResponse.cs
+      PaymentStatus.cs
   Middleware/
     GlobalExceptionHandler.cs
   Configuration/
     ServiceCollectionExtensions.cs
+  GlobalUsings.cs
   Program.cs
 
 src/PaymentGateway.Application/
@@ -72,7 +77,14 @@ src/PaymentGateway.Infrastructure/
   Persistence/
     InMemoryPaymentRepository.cs
   Configuration/
+
+tests/PaymentGateway.Api.IntegrationTests/
+  Controllers/
+    PaymentsContractTests.cs
+  GlobalUsings.cs
 ```
+
+`Api` is organised by **transport role**; `Application`, `Domain`, and `Infrastructure` are organised by **business capability**. See "Feature organization" below for why, and `CLAUDE.md` section 4 for the full tree.
 
 - Tests live in a top-level `tests/` directory mirroring the production capability names.
 - Deployment, scripts, and documentation stay outside `src/`.
@@ -81,7 +93,8 @@ src/PaymentGateway.Infrastructure/
 
 ## Namespaces and naming
 
-- Align namespaces with project and folder structure: `PaymentGateway.Application.Payments.ProcessPayment`.
+- Align namespaces with project and folder structure exactly: `PaymentGateway.Api.Contracts.Requests`, `PaymentGateway.Api.Controllers`, `PaymentGateway.Application.Payments.ProcessPayment`. Moving a file between folders means renaming its namespace in the same change.
+- A test project mirrors the folder structure of the project under test, so `Controllers/PaymentsController.cs` is covered by `Controllers/PaymentsContractTests.cs`.
 - File-scoped namespaces for all new files.
 - Name interfaces for capabilities (`IAcquiringBankClient`, `IPaymentRepository`), not implementations (`IPaymentProviderService`).
 - Name commands and queries after intent (`ProcessPaymentCommand`, `GetPaymentQuery`); name handlers after what they handle.

@@ -64,7 +64,9 @@ The repository currently contains only `PaymentGateway.Api`. Grow into the struc
 
 ## Feature organization
 
-Group by business capability inside each project:
+`Api` is organised by **transport role** — `Controllers/`, `Contracts/Requests/`, `Contracts/Responses/`, `Middleware/`, `Configuration/`. That layer's reasons to change are a route, a status code, or a serialization rule, and those cut across every capability. It is also the shape ASP.NET Core's own templates use, so a reviewer needs no orientation.
+
+`Application`, `Domain`, and `Infrastructure` are organised by **business capability**:
 
 ```text
 Application/Payments/
@@ -79,7 +81,7 @@ Application/Payments/
     GetPaymentResult.cs
 ```
 
-Code that changes together lives together. Avoid a global `Services`, `Helpers`, or `Utilities` folder that hides ownership.
+Code that changes together lives together, so group by whatever actually varies: transport concerns in `Api`, use cases inside the layers that hold business rules. Avoid a global `Services`, `Helpers`, or `Utilities` folder that hides ownership.
 
 ## Adding a dependency
 

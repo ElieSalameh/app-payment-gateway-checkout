@@ -37,12 +37,15 @@ Return `400` with the field name and reason for each failure, so the merchant ca
   "title": "One or more validation errors occurred.",
   "status": 400,
   "traceId": "00-...",
+  "paymentStatus": "Rejected",
   "errors": {
     "cvv": ["CVV must be 3 or 4 digits."],
     "expiryYear": ["Expiry date must be in the future."]
   }
 }
 ```
+
+The `paymentStatus` extension member keeps the brief's three-outcome vocabulary on the wire without inventing a second error shape. The payment envelope itself never carries `Rejected`, because no payment was created — which is why the wire `PaymentStatus` enum is exactly `Authorized` and `Declined`, matching the brief's response table.
 
 Document explicitly in `README.md` that `Rejected` maps to `400`, produces **no** stored payment, **no** payment id, and **no** call to the simulator.
 
