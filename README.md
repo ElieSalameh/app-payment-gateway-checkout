@@ -44,14 +44,72 @@ Valid requests should return:
 
 ### Retrieving a payment
 
-The target API contract is:
+The API contract is:
 
 - `POST /payments` — validate and process a payment.
 - `GET /payments/{id}` — retrieve a payment by ID.
 
-The retrieval response should include the payment ID, status, masked card details, expiry month and year, currency, and amount. An unknown payment ID is expected to return `404 Not Found`.
+The retrieval response includes the payment ID, status, masked card details, expiry month and year, currency, and amount.
 
-The final response envelope and HTTP status mapping will be documented as the API is implemented.
+## API contract
+
+### Supported currencies
+
+`GBP`, `USD`, and `EUR`. Exactly three, as the brief requires. Any other currency code is rejected.
+
+### Status codes
+
+| Status | When | Body |
+| --- | --- | --- |
+| `201 Created` | The payment reached the acquiring bank and was `Authorized` or `Declined` | `PaymentResponse` |
+| `200 OK` | An existing payment was retrieved | `PaymentResponse` |
+| `400 Bad Request` | The request failed gateway validation and was **rejected** | `ValidationProblemDetails` |
+| `404 Not Found` | No payment exists for the given ID | `ProblemDetails` |
+| `502 Bad Gateway` | The bank simulator was unavailable | `ProblemDetails` |
+| `504 Gateway Timeout` | The bank simulator did not respond in time | `ProblemDetails` |
+| `500 Internal Server Error` | Anything unexpected | `ProblemDetails` |
+
+Both `Authorized` and `Declined` are successful processing, so both return `201`. A `502` or `504` is a dependency failure with an **unknown** outcome. It is never reported as `Declined`, and nothing is stored.
+
+### Payment response
+
+```json
+{
+  "id": "3fa85f64-5717-4562-b3fc-2c963f66afa6",
+  "status": "Authorized",
+  "lastFourCardDigits": "8877",
+  "expiryMonth": 4,
+  "expiryYear": 2030,
+  "currency": "GBP",
+  "amount": 100
+}
+```
+
+`status` is `Authorized` or `Declined` only. `Rejected` never appears here, because the brief states that a rejected request creates no payment, so there is no payment resource to return.
+
+### Rejected response
+
+A rejected request returns `400` with an RFC 7807 body. The `paymentStatus` member carries the brief's third outcome, and `traceId` lets a merchant's report be traced in the logs without exposing anything internal.
+
+```json
+{
+  "type": "https://tools.ietf.org/html/rfc9110#section-15.5.1",
+  "title": "One or more validation errors occurred.",
+  "status": 400,
+  "traceId": "00-...",
+  "paymentStatus": "Rejected",
+  "errors": {
+    "cvv": ["CVV must be 3 or 4 digits."],
+    "expiryYear": ["Expiry date must be in the future."]
+  }
+}
+```
+
+A rejected request produces **no** stored payment, **no** payment id, and **no** call to the bank simulator.
+
+### Current status
+
+This commit publishes the contract and its OpenAPI document only. Both endpoints return `501 Not Implemented` until the domain, application, and infrastructure layers land in the following steps. The routes, request and response shapes, and documented status codes above are final.
 
 ## Bank simulator
 
@@ -152,18 +210,18 @@ The simulator should be available at `http://localhost:8080`.
 ### Run the API
 
 ```powershell
-dotnet restore
-dotnet run --project src/PaymentGateway.Api/PaymentGateway.Api.csproj
+dotnet restore .\PaymentGatewayCheckout.slnx
+dotnet run --project .\src\PaymentGateway.Api\PaymentGateway.Api.csproj
 ```
 
-Swagger/OpenAPI is available in the development environment when the API is running.
+Swagger/OpenAPI is available in the Development environment only, at `/swagger`.
 
 ### Run tests
 
-Once the test projects are added:
+From the repository root:
 
 ```powershell
-dotnet test
+dotnet test .\PaymentGatewayCheckout.slnx
 ```
 
 ## Security and data handling
@@ -187,7 +245,7 @@ The following are not required for this assessment:
 
 ## Implementation roadmap
 
-- [ ] Define the public request, response, and error contracts.
+- [x] Define the public request, response, and error contracts.
 - [ ] Implement payment validation and rejected behavior.
 - [ ] Implement the configurable bank simulator client.
 - [ ] Map authorized, declined, and dependency-failure outcomes.
