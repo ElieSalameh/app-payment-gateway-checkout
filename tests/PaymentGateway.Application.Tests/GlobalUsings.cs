@@ -1,6 +1,13 @@
 global using FluentAssertions;
 global using FluentValidation;
 global using FluentValidation.TestHelper;
+global using Microsoft.Extensions.Logging.Abstractions;
 global using Microsoft.Extensions.Time.Testing;
+global using PaymentGateway.Application.Abstractions;
+global using PaymentGateway.Application.Exceptions;
+global using PaymentGateway.Application.Payments.GetPayment;
 global using PaymentGateway.Application.Payments.ProcessPayment;
+global using PaymentGateway.Application.Tests.Abstractions;
+global using PaymentGateway.Domain.Payments;
+global using PaymentGateway.Domain.Shared;
 global using Xunit;

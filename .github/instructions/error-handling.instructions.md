@@ -7,7 +7,7 @@ applyTo: "**/*.cs"
 
 ## Principles
 
-- **Exceptions are for the exceptional.** Validation failure is an expected outcome the brief names (`Rejected`); it is returned as a result, not thrown.
+- **Exceptions are for the exceptional**, with one deliberate exception: validation. `ProcessPaymentHandler` calls `ValidateAndThrowAsync`, so a rejected request leaves the handler as a `ValidationException` and the global handler maps it to the `400` rejection shape. Returning a result union instead would need a second refusal vocabulary in `Application` and would rebuild the rejection body at the controller.
 - Never catch `Exception` except in the global handler.
 - Never swallow an exception silently. Handle it, translate it, or let it bubble.
 - Do not catch unless the code can add useful context, translate the failure, recover, or enforce a boundary policy. Preserve the original as `InnerException` when rethrowing.

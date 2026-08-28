@@ -32,7 +32,7 @@ All four source projects now exist, along with `Domain.Tests`, `Application.Test
 ## Dependency direction
 
 - `Api` depends on `Application`. It may reference `Infrastructure` **only** at the composition root, to register implementations.
-- `Application` depends on `Domain` only. Never on `Api`, `Infrastructure`, `HttpClient`, or serialization types.
+- `Application` depends on `Domain` only, plus FluentValidation and the `Microsoft.Extensions` abstractions for dependency injection and logging. Never on `Api`, `Infrastructure`, `HttpClient`, or serialization types.
 - `Domain` depends on nothing outside the BCL. No ASP.NET Core, no persistence, no serialization, no external services.
 - `Infrastructure` depends on `Application` and `Domain` to implement the ports the inner layers define.
 - Never reference an outer project from an inner project. No circular project references.
@@ -43,8 +43,9 @@ All four source projects now exist, along with `Domain.Tests`, `Application.Test
 - Model the required operations as explicit use cases: `ProcessPayment` and `GetPayment`.
 - Define ports in the layer that needs the capability, implement them at the edge. The only two ports are `IAcquiringBankClient` and `IPaymentRepository`. Do not add `IUnitOfWork` or other speculative abstractions, and do not create an interface for every class solely to enable mocking.
 - **Validation belongs in `Application`, on the command**, not on the HTTP request model in `Api`. `Rejected` is a business outcome the brief names, so the rule producing it belongs with the use case and must not be bypassable by a second entry point. Use FluentValidation.
-- Return explicit result types for expected outcomes. Invalid input is `Rejected`; the simulator's authorization result maps to `Authorized` or `Declined`; a simulator failure stays a dependency failure and is not a payment outcome.
-- Keep orchestration in handlers and business invariants in domain objects.
+- Return explicit result types for expected outcomes: `ProcessPaymentResult` and `GetPaymentResult`, one per use case, each built by a `From(Payment)` factory. The simulator's authorization result maps to `Authorized` or `Declined`; a simulator failure stays a dependency failure and is not a payment outcome. `Rejected` is the exception to the rule — it leaves the handler as a `ValidationException` and becomes the `400` body, for the reasons in `error-handling.instructions.md`.
+- Keep orchestration in handlers and business invariants in domain objects. A handler validates, calls its ports, maps, and persists; it holds no rules of its own.
+- A missing payment is `PaymentNotFoundException` from `GetPaymentHandler`, not a null return, so the `404` has a cause the gateway names and no caller can skip the check.
 
 ## Domain modeling
 
@@ -90,4 +91,4 @@ Code that changes together lives together, so group by whatever actually varies:
 
 ## Adding a dependency
 
-Before adding a package or a cross-layer reference, state which boundary requires it and why it cannot stay at the edge. Prefer the BCL and what .NET 8 already provides. The deliberate package set is FluentValidation, `Microsoft.Extensions.Http.Resilience`, Swashbuckle, and the test stack in `testing.instructions.md`. Anything beyond that needs a justification recorded in `README.md`.
+Before adding a package or a cross-layer reference, state which boundary requires it and why it cannot stay at the edge. Prefer the BCL and what .NET 8 already provides. The deliberate package set is FluentValidation, the `Microsoft.Extensions` dependency injection and logging abstractions, `Microsoft.Extensions.Http.Resilience`, Swashbuckle, and the test stack in `testing.instructions.md`. Anything beyond that needs a justification recorded in `README.md`.

@@ -32,8 +32,6 @@ internal static class ServiceCollectionExtensions
 
         services.AddExceptionHandler<GlobalExceptionHandler>();
 
-        services.AddExceptionHandler<GlobalExceptionHandler>();
-
         services.AddEndpointsApiExplorer();
         services.AddSwaggerGen(options => options.SwaggerDoc("v1", new OpenApiInfo
         {
