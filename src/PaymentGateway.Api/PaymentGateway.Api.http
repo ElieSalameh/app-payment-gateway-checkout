@@ -1,6 +1,59 @@
 @PaymentGateway.Api_HostAddress = http://localhost:5156
 
-GET {{PaymentGateway.Api_HostAddress}}/weatherforecast/
+### Process a payment - card ending in an odd digit is authorized by the simulator
+POST {{PaymentGateway.Api_HostAddress}}/payments
+Content-Type: application/json
+
+{
+  "cardNumber": "2222405343248877",
+  "expiryMonth": 4,
+  "expiryYear": 2030,
+  "currency": "GBP",
+  "amount": 100,
+  "cvv": "123"
+}
+
+### Process a payment - card ending in an even digit is declined by the simulator
+POST {{PaymentGateway.Api_HostAddress}}/payments
+Content-Type: application/json
+
+{
+  "cardNumber": "2222405343248112",
+  "expiryMonth": 4,
+  "expiryYear": 2030,
+  "currency": "USD",
+  "amount": 1050,
+  "cvv": "456"
+}
+
+### Process a payment - card ending in zero makes the simulator unavailable
+POST {{PaymentGateway.Api_HostAddress}}/payments
+Content-Type: application/json
+
+{
+  "cardNumber": "2222405343248870",
+  "expiryMonth": 4,
+  "expiryYear": 2030,
+  "currency": "EUR",
+  "amount": 100,
+  "cvv": "789"
+}
+
+### Process a payment - invalid input is rejected without calling the simulator
+POST {{PaymentGateway.Api_HostAddress}}/payments
+Content-Type: application/json
+
+{
+  "cardNumber": "abc",
+  "expiryMonth": 13,
+  "expiryYear": 2020,
+  "currency": "XYZ",
+  "amount": 0,
+  "cvv": "1"
+}
+
+### Retrieve a payment
+GET {{PaymentGateway.Api_HostAddress}}/payments/3fa85f64-5717-4562-b3fc-2c963f66afa6
 Accept: application/json
 
 ###

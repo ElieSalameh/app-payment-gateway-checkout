@@ -19,7 +19,7 @@ applyTo: "**/*.cs,**/*.csproj,**/*.props,**/*.targets"
 - **Keep production code free of developer comments.** Express intent through descriptive names for variables, methods, types, and parameters, plus small focused methods and straightforward control flow. See `file-organization.instructions.md`.
 - Keep public API surface small. Types and members are `internal` unless deliberately part of a contract.
 - Prefer immutable data. `record` for request, response, command, and result models. `sealed` on any class not designed for inheritance.
-- `required` properties on contracts so the compiler enforces construction.
+- `required` properties on models the server constructs — responses, commands, results — so the compiler enforces construction. **Not** on the inbound `ProcessPaymentRequest`: presence is a validation rule, and every rule that produces `Rejected` belongs to the FluentValidation validator in `Application` where it cannot be bypassed by a second entry point. Inbound properties are nullable with no validation attributes, so a missing field yields a field-level error rather than a System.Text.Json binding failure.
 - File-scoped namespaces. A single `GlobalUsings.cs` per project rather than scattered `using` blocks.
 - Target-typed `new()`, collection expressions, and pattern matching over long `if`/`else` chains.
 - Guard clauses at the boundary where input enters.

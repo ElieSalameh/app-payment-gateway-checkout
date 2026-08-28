@@ -1,3 +1,8 @@
 <Solution>
-  <Project Path="src/PaymentGateway.Api/PaymentGateway.Api.csproj" Id="35350849-42a4-474b-b02c-639b792c6081" />
+  <Folder Name="/src/">
+    <Project Path="src/PaymentGateway.Api/PaymentGateway.Api.csproj" Id="35350849-42a4-474b-b02c-639b792c6081" />
+  </Folder>
+  <Folder Name="/tests/">
+    <Project Path="tests/PaymentGateway.Api.IntegrationTests/PaymentGateway.Api.IntegrationTests.csproj" />
+  </Folder>
 </Solution>
