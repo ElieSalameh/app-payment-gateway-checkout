@@ -15,7 +15,17 @@ applyTo: "**/*.cs"
 
 ## Global handler
 
-Use .NET 8's `IExceptionHandler`, registered with `AddExceptionHandler<GlobalExceptionHandler>()` and `UseExceptionHandler()`. It maps exceptions to RFC 7807 `ProblemDetails`:
+**Write our own handler. Do not leave error responses to the framework's defaults.**
+
+Implement `GlobalExceptionHandler` against .NET 8's `IExceptionHandler`, registered with `AddExceptionHandler<GlobalExceptionHandler>()` and `UseExceptionHandler()`. Every exception-to-status mapping lives in that one file, visible side by side.
+
+This is a deliberate exception to the general rule of preferring framework behaviour over a custom equivalent, and it is worth the file for three reasons:
+
+- **The mapping is readable in one place.** Anyone can open one file and see exactly what a merchant receives for every failure, without running the app or knowing which convention produced it.
+- **It is cheap to correct.** When a mapping turns out to be wrong — and on a payments API a wrong mapping is a business defect, not a cosmetic one — the fix is one line in a table rather than a hunt through configuration.
+- **Defaults hide decisions.** The built-in path has already caused two real defects on this codebase: it leaked internal .NET type names (`System.Nullable\`1[System.Int32]`, the request DTO's full type name) into `400` bodies, and a `[Produces]` attribute silently overrode the `problem+json` content type. Nothing in the source hinted at either; both were found only by calling the running API.
+
+Keep using the framework's `ProblemDetails` types and the `IExceptionHandler` extension point. What we own explicitly is the mapping itself:
 
 | Exception | Status | Merchant sees |
 | --- | --- | --- |

@@ -49,9 +49,12 @@ The repository currently contains only `PaymentGateway.Api`. Grow into the struc
 ## Domain modeling
 
 - Use value objects where validation and value identity are meaningful: `Money`, `Currency`, `PaymentId`, `CardDetails`. Do not wrap a primitive in a type that adds no behavior.
-- `CardDetails` holds the **last four digits only**. The full PAN never enters the domain model or the repository.
-- Entities maintain their own valid state. No public setters or mutable collections behind an invariant.
-- The payment outcome is exactly `Authorized`, `Declined`, or `Rejected`. Do not add capture, refund, void, or other transitions.
+- `CardDetails` holds the **last four digits only**, plus the expiry month and year. The full PAN never enters the domain model or the repository. `CardDetails.FromCardNumber` is the **single** place a card number is reduced to its last four digits — there is no other masking helper anywhere in the codebase.
+- Entities maintain their own valid state, enforced by private constructors and static factories. No public setters, and no way to construct an invalid instance.
+- A stored `Payment` is exactly `Authorized` or `Declined`. `Rejected` is **not** a domain status: the brief says a rejected request creates no payment, so there is nothing to store and nothing to give a status to. `Rejected` exists only as the gateway's `400` response. Do not add capture, refund, void, or other transitions.
+- `Money` is a `long` count of minor units paired with a `Currency`, and must be greater than zero. `Currency` owns the supported set — `GBP`, `USD`, `EUR` — and parsing is case-insensitive but always yields the canonical uppercase code.
+- Domain guards throw `ArgumentException` / `ArgumentOutOfRangeException`, because by the time a value reaches the domain it has already passed validation; a violation is a programmer error, not a merchant error. Guard messages state the rule and never echo the rejected value, so a card number cannot leak through an exception.
+- Time never comes from inside the domain. A rule that needs the clock takes it as a parameter, as `CardDetails.HasExpired(DateTimeOffset asOf)` does, which keeps the domain deterministic and leaves `TimeProvider` at the application boundary.
 - Keep simulator status codes and retry behavior out of the domain; map them to a stable internal model at the edge.
 - Do not add domain events for two synchronous use cases.
 

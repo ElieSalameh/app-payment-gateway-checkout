@@ -14,7 +14,7 @@ How that is earned:
 - Methods are verb phrases stating what they do: `ProcessPayment`, `MaskCardNumber`, `IsSupportedCurrency`.
 - Booleans read as predicates: `IsAuthorized`, `HasExpired`, `RequiresRetry`.
 - No abbreviations beyond the universally understood ones (`Id`, `Api`, `Http`, `Cvv`). Write `cardNumber`, not `cn`.
-- No magic values. `const int MinimumCardNumberLength = 14;` — the constant name **is** the comment.
+- No magic values. `private const int _MinimumCardNumberLength = 14;` — the constant name **is** the comment. Every constant takes the underscore prefix, including one declared inside a method body; see `dotnet.instructions.md`.
 - Extract any conditional you would have explained into a named method or a named local: `var isDeclinedByBank = ...`.
 - Methods stay short enough to hold in your head. A method needing section comments to be navigable needs splitting.
 - Parameters are named for their role, not their type.
