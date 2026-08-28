@@ -1,82 +1,86 @@
 ---
-applyTo: "**/*.cs,**/*.csproj"
+applyTo: "**/*.cs,**/*.csproj,**/*.slnx"
 ---
 # Decoupled architecture for this assessment
 
-Use `.github/project-context/project-scope.md` as the functional source of truth. The required capabilities are processing a payment and retrieving a payment; architecture must support those capabilities without adding unrelated production infrastructure.
+`CLAUDE.md` section 4 is canonical. `.github/project-context/project-scope.md` is the functional source of truth. The required capabilities are processing a payment and retrieving a payment; architecture must support those without adding unrelated production infrastructure.
 
-## Preferred boundaries
+## Target structure
 
-Use a pragmatic layered or vertical-slice architecture. For this assessment, the business rules must not depend on ASP.NET Core, HTTP clients, SDKs, or the bank simulator. A single API project is acceptable initially; split projects only when the boundary improves compilation safety or testability.
-
-A solution can evolve toward this structure:
+Four source projects and four test projects. Dependencies point inward.
 
 ```text
 src/
   PaymentGateway.Api/             # HTTP endpoints, serialization, pipeline, composition root
-  PaymentGateway.Application/     # process/retrieve use cases, validation, ports, DTOs
-  PaymentGateway.Domain/          # payment state, value objects, and business invariants
-  PaymentGateway.Infrastructure/  # bank HTTP client and in-memory repository
+  PaymentGateway.Application/     # use cases, validation, ports, commands and results
+  PaymentGateway.Domain/          # payment state, value objects, business invariants
+  PaymentGateway.Infrastructure/  # bank simulator HTTP client, in-memory repository
 
 tests/
   PaymentGateway.Domain.Tests/
   PaymentGateway.Application.Tests/
+  PaymentGateway.Infrastructure.Tests/
   PaymentGateway.Api.IntegrationTests/
 ```
 
-Do not add a real database, queue, outbox, webhook system, or payment-provider SDK for this assessment. The README explicitly allows a test-double repository. Create a separate project when it enforces a useful dependency boundary—not merely to create more folders.
+`Domain` is a separate assembly on purpose: it makes "the business rules depend on nothing" a compiler guarantee rather than a folder convention that quietly erodes. This is the layout Microsoft's reference applications and the common Clean Architecture templates use, so a reviewer reads it without needing the decision explained.
+
+The brief's warning about over-engineering targets speculative **features**, not assembly boundaries. Do not add a real database, queue, outbox, webhook system, payment-provider SDK, MediatR or another mediator, a CQRS bus, AutoMapper, event sourcing, or an idempotency protocol. The README explicitly allows a test-double repository.
+
+The repository currently contains only `PaymentGateway.Api`. Grow into the structure above as each layer gains its first real type — create a project when it has something to hold, not in advance.
 
 ## Dependency direction
 
-- `Api` may depend on `Application`, and the composition root may register `Infrastructure`.
-- `Application` may depend on `Domain`, but not on `Api`, `Infrastructure`, the bank HTTP client, or serialization types.
-- `Domain` should have no dependency on ASP.NET Core, persistence, serialization, or external services.
-- `Infrastructure` may depend on `Application` and `Domain` to implement ports defined by the inner layers.
-- Dependencies point inward. Do not reference an outer project from an inner project.
-- Keep provider-specific types at the infrastructure boundary. Translate them to application or domain types immediately.
+- `Api` depends on `Application`. It may reference `Infrastructure` **only** at the composition root, to register implementations.
+- `Application` depends on `Domain` only. Never on `Api`, `Infrastructure`, `HttpClient`, or serialization types.
+- `Domain` depends on nothing outside the BCL. No ASP.NET Core, no persistence, no serialization, no external services.
+- `Infrastructure` depends on `Application` and `Domain` to implement the ports the inner layers define.
+- Never reference an outer project from an inner project. No circular project references.
+- Keep provider-specific types at the infrastructure boundary and translate them to application or domain types immediately.
 
 ## Use cases and ports
 
-- Model the required operations as explicit use cases: `ProcessPayment` and `GetPayment` (or equivalent names matching the public API).
-- Define interfaces (ports) in the inner layer where the capability is needed, then implement them at the edge. The useful ports here are a bank client and a payment repository; do not add `IUnitOfWork` or other speculative abstractions.
-- Keep interfaces narrow and outcome-oriented. Do not create an interface for every class solely to enable mocking.
-- Return explicit result types for expected outcomes: invalid input is `Rejected`, the simulator's authorization result maps to `Authorized` or `Declined`, and a simulator failure remains a dependency failure.
-- Keep orchestration in application services or handlers; keep business invariants in domain objects.
+- Model the required operations as explicit use cases: `ProcessPayment` and `GetPayment`.
+- Define ports in the layer that needs the capability, implement them at the edge. The only two ports are `IAcquiringBankClient` and `IPaymentRepository`. Do not add `IUnitOfWork` or other speculative abstractions, and do not create an interface for every class solely to enable mocking.
+- **Validation belongs in `Application`, on the command**, not on the HTTP request model in `Api`. `Rejected` is a business outcome the brief names, so the rule producing it belongs with the use case and must not be bypassable by a second entry point. Use FluentValidation.
+- Return explicit result types for expected outcomes. Invalid input is `Rejected`; the simulator's authorization result maps to `Authorized` or `Declined`; a simulator failure stays a dependency failure and is not a payment outcome.
+- Keep orchestration in handlers and business invariants in domain objects.
 
 ## Domain modeling
 
-- Use value objects for concepts with meaningful validation and identity by value, such as `Money`, `Currency`, and `PaymentId`. Do not introduce a value object solely to wrap a primitive without behavior.
-- Keep entities responsible for maintaining valid state. Do not expose mutable collections or public setters for state that has invariants.
-- Represent the assessment's payment outcome explicitly: `Authorized`, `Declined`, or `Rejected`. Do not add capture, refund, or other state transitions that are outside the requirements.
-- Keep provider status codes and provider-specific retry behavior out of the domain model; map them to a stable internal model.
-- Do not add domain events for the two synchronous use cases unless a demonstrated requirement needs them.
+- Use value objects where validation and value identity are meaningful: `Money`, `Currency`, `PaymentId`, `CardDetails`. Do not wrap a primitive in a type that adds no behavior.
+- `CardDetails` holds the **last four digits only**. The full PAN never enters the domain model or the repository.
+- Entities maintain their own valid state. No public setters or mutable collections behind an invariant.
+- The payment outcome is exactly `Authorized`, `Declined`, or `Rejected`. Do not add capture, refund, void, or other transitions.
+- Keep simulator status codes and retry behavior out of the domain; map them to a stable internal model at the edge.
+- Do not add domain events for two synchronous use cases.
 
-## Boundaries and transactions
+## Boundaries
 
-- Map HTTP request models to application commands and map application results to HTTP response models. Do not expose domain entities directly from controllers.
-- Do not pass `HttpContext`, `ControllerBase`, `DbContext`, provider SDK objects, or `IConfiguration` into domain or application code.
-- Use the in-memory or test-double repository allowed by the assessment. Keep it behind the repository port so it can be replaced without changing the use case.
-- Treat the simulator as unreliable: configure an HTTP timeout, map its `503` response to a clear dependency failure, and do not report a false authorization or decline. Do not add retries that could duplicate a payment request unless idempotency is implemented deliberately.
+- Map HTTP request models to application commands, and application results to HTTP response models. Never return a domain entity from a controller.
+- Do not pass `HttpContext`, `ControllerBase`, provider SDK objects, or `IConfiguration` into application or domain code. Bind typed options instead.
+- Keep the in-memory repository behind `IPaymentRepository` so it can be replaced without touching a use case.
+- Treat the simulator as unreliable: bounded HTTP timeout, `503` mapped to a clear dependency failure, no false authorization or decline. Do not retry the non-idempotent payment request — a retry risks double-charging, and idempotency is not implemented.
 
 ## Feature organization
 
-Prefer grouping code by business capability once the API grows:
+Group by business capability inside each project:
 
 ```text
 Application/Payments/
-  CreatePayment/
-	ProcessPaymentCommand.cs
-	ProcessPaymentHandler.cs
-	ProcessPaymentValidator.cs
-	ProcessPaymentResult.cs
+  ProcessPayment/
+    ProcessPaymentCommand.cs
+    ProcessPaymentHandler.cs
+    ProcessPaymentValidator.cs
+    ProcessPaymentResult.cs
   GetPayment/
-	GetPaymentQuery.cs
-	GetPaymentHandler.cs
-	GetPaymentResult.cs
+    GetPaymentQuery.cs
+    GetPaymentHandler.cs
+    GetPaymentResult.cs
 ```
 
-Keep code that changes together close together. Avoid a single global `Services`, `Helpers`, or `Utilities` folder that hides ownership and dependencies.
+Code that changes together lives together. Avoid a global `Services`, `Helpers`, or `Utilities` folder that hides ownership.
 
 ## Adding a dependency
 
-Before adding a package or cross-layer reference, explain which boundary requires it and why the dependency cannot remain at the edge. Prefer framework and BCL capabilities already available in .NET 8. Verify licensing, maintenance, security, and transitive dependency impact for third-party packages.
+Before adding a package or a cross-layer reference, state which boundary requires it and why it cannot stay at the edge. Prefer the BCL and what .NET 8 already provides. The deliberate package set is FluentValidation, `Microsoft.Extensions.Http.Resilience`, Swashbuckle, and the test stack in `testing.instructions.md`. Anything beyond that needs a justification recorded in `README.md`.

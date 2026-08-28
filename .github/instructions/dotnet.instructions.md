@@ -3,49 +3,85 @@ applyTo: "**/*.cs,**/*.csproj,**/*.props,**/*.targets"
 ---
 # .NET 8 development standards for this assessment
 
-Use `.github/project-context/project-scope.md` as the functional source of truth. Favor simple, readable code that fulfills payment processing and retrieval; do not add production infrastructure that is not required.
+`CLAUDE.md` section 2 is canonical. `.github/project-context/project-scope.md` is the functional source of truth. Favor simple, readable code that fulfills payment processing and retrieval; do not add production infrastructure that is not required.
+
+## Project settings
+
+- Target `net8.0` in every project. The solution file is `PaymentGatewayCheckout.slnx`, which needs SDK **9.0.200 or newer** on the CLI; CI installs both 8 and 9.
+- `<Nullable>enable</Nullable>` and `<ImplicitUsings>enable</ImplicitUsings>` everywhere.
+- `<TreatWarningsAsErrors>true</TreatWarningsAsErrors>`. Fix nullability warnings; never suppress with `!` or by disabling the analyzer.
+- Put shared properties in a root `Directory.Build.props` once there is more than one project, rather than repeating them.
 
 ## General rules
 
-- Target the repository's configured .NET version (`net8.0`) unless a task explicitly requires otherwise.
-- Keep nullable reference types enabled. Fix nullability warnings instead of suppressing them with `!` or disabling nullable analysis.
-- Prefer clear, intention-revealing code over clever abstractions. Do not add an abstraction until it protects a boundary or is reused.
-- Follow the existing naming and formatting conventions. Use PascalCase for types and public members, camelCase for parameters and locals, and `_camelCase` for private fields.
-- Keep production code free of developer comments. Make intent clear through descriptive names for variables, methods, types, and parameters, plus small focused methods and straightforward control flow.
-- Keep public APIs small. Make types and members `internal` unless they are part of a deliberate application or library contract.
-- Prefer immutable data. Use `record` types for value-like request, response, and message models when appropriate.
-- Use guard clauses and validate inputs at the boundary where they enter the application.
+- Prefer clear, intention-revealing code over clever abstraction. Do not add an abstraction until it protects a boundary or is reused.
+- PascalCase for types and public members, camelCase for parameters and locals, `_camelCase` for private fields.
+- **Keep production code free of developer comments.** Express intent through descriptive names for variables, methods, types, and parameters, plus small focused methods and straightforward control flow. See `file-organization.instructions.md`.
+- Keep public API surface small. Types and members are `internal` unless deliberately part of a contract.
+- Prefer immutable data. `record` for request, response, command, and result models. `sealed` on any class not designed for inheritance.
+- `required` properties on contracts so the compiler enforces construction.
+- File-scoped namespaces. A single `GlobalUsings.cs` per project rather than scattered `using` blocks.
+- Target-typed `new()`, collection expressions, and pattern matching over long `if`/`else` chains.
+- Guard clauses at the boundary where input enters.
+- No magic values. A named `const` is how a number explains itself in a comment-free codebase.
 
-## Async and resource management
+## Money and time
 
-- Use `async`/`await` for I/O-bound work and pass `CancellationToken` through application and infrastructure boundaries.
-- Do not use `.Result`, `.Wait()`, or synchronous blocking around asynchronous operations.
+- Amounts are **integers in minor units**, always paired with an explicit currency. Never `double` or `float` for money.
+- Supported currencies are exactly `GBP`, `USD`, `EUR`.
+- Inject `TimeProvider` and read the clock through it. Never call `DateTime.UtcNow` or `DateTime.Now` in a code path that has a rule attached — expiry validation above all, which is otherwise untestable and rots on a fixed date.
+
+## Async and resources
+
+- `async`/`await` for I/O. Pass `CancellationToken` through every application and infrastructure boundary and into the `HttpClient` call.
+- Never `.Result`, `.Wait()`, or `.GetAwaiter().GetResult()`.
 - Do not use `Task.Run` to make naturally asynchronous I/O asynchronous.
-- Use `IAsyncEnumerable<T>` only when streaming is part of the contract; otherwise return a materialized result with an explicit shape.
-- Dispose `IDisposable` and `IAsyncDisposable` resources deterministically. Let dependency injection own the lifetime of registered services.
-- Use `HttpClient` through `IHttpClientFactory`; never create a new `HttpClient` per request.
+- `ValueTask` only on a hot path that has been measured. `Task` otherwise.
+- `IAsyncEnumerable<T>` only when streaming is part of the contract.
+- Dispose `IDisposable`/`IAsyncDisposable` deterministically; let DI own registered service lifetimes.
+- Obtain `HttpClient` through `IHttpClientFactory` as a typed client. Never `new HttpClient()`.
 
 ## Dependency injection and configuration
 
-- Register services in one clear composition root, normally `Program.cs` or extension methods called by it.
-- Use constructor injection. Avoid service locator patterns and direct calls to `IServiceProvider` in application code.
-- Choose service lifetimes deliberately: singleton services must be thread-safe, scoped services must not be injected into singletons, and transient services should be lightweight.
-- Bind configuration such as the bank simulator URL and supported currencies to typed options with `IOptions<T>`, `IOptionsSnapshot<T>`, or `IOptionsMonitor<T>` as appropriate. Validate required options at startup.
-- Never store credentials, API keys, tokens, or card data in source control, logs, configuration committed to the repository, or exception messages.
+- One clear composition root: `Program.cs`, calling `AddApplication()` and `AddInfrastructure(configuration)` extension methods so it stays readable.
+- Constructor injection only. No service locator, no `IServiceProvider` in application code.
+- Choose lifetimes deliberately. The in-memory repository is a thread-safe singleton (`ConcurrentDictionary`). Scoped services must never be injected into singletons.
+- Bind configuration to typed options and validate at startup:
+  `services.AddOptions<BankSimulatorOptions>().Bind(...).ValidateDataAnnotations().ValidateOnStart();`
+  `ValidateOnStart()` is required — a misconfigured app must fail at boot, not on the first payment.
+- Use a `const string SectionName` on the options type instead of magic configuration keys.
+- Never put credentials, tokens, or card data in source control, logs, committed configuration, or exception messages.
+
+## HTTP resilience
+
+- Use `Microsoft.Extensions.Http.Resilience` on the bank client for a bounded timeout and a circuit breaker.
+- **Do not blindly retry the payment request.** It is not idempotent, and a retry risks double-charging. Retrying a connect-phase failure that provably never reached the simulator is defensible; retrying after the request was sent is not. Whatever is chosen, record the reasoning in `README.md`.
+- Set an explicit `HttpClient.Timeout`. A hanging simulator must not hang a merchant.
+
+## JSON
+
+- `System.Text.Json` only. Configure serialization once in `Program.cs`.
+- The gateway's public API is **camelCase**. The simulator is **snake_case** with an `MM/yyyy` expiry string.
+- That translation lives in `Infrastructure` and nowhere else, via `[JsonPropertyName]` on the simulator DTOs. Never let the simulator's naming reach the public contract or the domain.
+- Reject unknown properties rather than silently ignoring them.
+
+## Validation
+
+- **FluentValidation**, on the application command, in `Application`. Do not mix DataAnnotations and FluentValidation on the same type.
+- The rules, all of which must be enforced: card number required, 14–19 characters, digits only; expiry month required, 1–12; expiry year required with month and year combined strictly in the future; currency required, exactly 3 characters, one of the three supported; amount required, integer, greater than zero; CVV required, 3–4 characters, digits only.
 
 ## ASP.NET Core behavior
 
-- Keep controllers or endpoint handlers thin: validate, call a payment use case, and map the result to HTTP. Authentication is not part of the stated assessment requirements.
-- Use the framework's built-in dependency injection, routing, model validation, logging, and problem-details support before adding custom equivalents.
-- Return consistent `ProblemDetails` responses for errors. Do not expose stack traces or infrastructure details to clients.
-- Use structured logging with stable event names and properties. Do not interpolate sensitive values into log messages.
-- Make HTTP status codes part of the API contract. Document the chosen responses for rejected input, unknown payment IDs, and simulator failures; do not invent endpoint behavior that is not needed by the assessment.
-- Document public HTTP contracts with OpenAPI and keep examples synchronized with the implementation.
+- Controllers stay thin: bind, call the use case, map the result to a status code. No business logic. Authentication is not part of this assessment.
+- Use the framework's routing, DI, logging, and `ProblemDetails` support before writing a custom equivalent.
+- Return `ActionResult<T>` with explicit status codes and annotate with `[ProducesResponseType]` so the OpenAPI document matches reality.
+- Route parameters typed as `Guid` so malformed ids fail at model binding.
+- Enable Swagger in Development only.
+- Structured logging with stable event names. Never interpolate values into a log message. See `logging.instructions.md`.
 
 ## Quality gates
 
-- Build with warnings visible and treat new warnings as defects.
-- Add or update automated tests for behavior changes.
-- Keep methods focused and avoid classes that mix transport, business, persistence, and external-provider concerns.
-- Prefer the BCL and existing ASP.NET Core packages. Do not add a database, messaging library, payment SDK, or authentication package unless a requirement justifies it.
-- Do not catch exceptions unless the code can add useful context, translate the failure, recover, or enforce a boundary policy. Preserve the original exception as the inner exception when rethrowing.
+- The build must be clean. New warnings are defects.
+- Add or update tests for every behavior change.
+- Do not catch an exception unless the code can add context, translate the failure, recover, or enforce a boundary policy. Preserve the original as `InnerException` when rethrowing. See `error-handling.instructions.md`.
+- Keep methods focused. No type that mixes transport, business, persistence, and provider concerns.
