@@ -64,6 +64,8 @@ All four source projects now exist, along with `Domain.Tests`, `Application.Test
 - Do not pass `HttpContext`, `ControllerBase`, provider SDK objects, or `IConfiguration` into application or domain code. Bind typed options instead.
 - Keep the in-memory repository behind `IPaymentRepository` so it can be replaced without touching a use case. The port is `Add(Payment, CancellationToken)` and `GetById(PaymentId, CancellationToken)` — it takes `PaymentId`, never a raw `Guid`, because the repository boundary is the mix-up `PaymentId` exists to prevent. `Add` throws on an id that is already stored rather than overwriting a recorded charge, and both methods honour their `CancellationToken`.
 - Treat the simulator as unreliable: bounded HTTP timeout, `503` mapped to a clear dependency failure, no false authorization or decline. Do not retry the non-idempotent payment request — a retry risks double-charging, and idempotency is not implemented.
+- The bank port is `Authorize(AuthorizationRequest, CancellationToken)` returning `AuthorizationResult`, both defined alongside `IAcquiringBankClient` in `Application/Abstractions/`. The result carries a `PaymentStatus`, not a bool, so a call site cannot confuse "not authorized" with "did not complete". `AuthorizationRequest` is one of only two types that hold the full PAN and CVV — the bank DTO is the other — and both redact `ToString()`.
+- Every unsuccessful bank response, not only `503`, becomes `AcquiringBankUnavailableException`, as does a `200` whose body cannot be read. The gateway must never infer `Declined` from a transport or protocol failure.
 
 ## Feature organization
 

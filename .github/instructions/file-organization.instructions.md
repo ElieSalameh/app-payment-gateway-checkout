@@ -45,6 +45,7 @@ src/PaymentGateway.Api/
     Requests/
       ProcessPaymentRequest.cs
     Responses/
+      PaymentRejection.cs
       PaymentResponse.cs
       PaymentStatus.cs
   Middleware/
@@ -61,7 +62,13 @@ src/PaymentGateway.Application/
       ProcessPaymentValidator.cs
     GetPayment/
   Abstractions/
+    IAcquiringBankClient.cs
+    AuthorizationRequest.cs
+    AuthorizationResult.cs
+    IPaymentRepository.cs
   Exceptions/
+    AcquiringBankTimeoutException.cs
+    AcquiringBankUnavailableException.cs
   Configuration/
     ServiceCollectionExtensions.cs
 
@@ -78,9 +85,13 @@ src/PaymentGateway.Domain/
 src/PaymentGateway.Infrastructure/
   Bank/
     BankSimulatorClient.cs
+    BankSimulatorOptions.cs
+    BankSimulatorPaymentRequest.cs
+    BankSimulatorPaymentResponse.cs
   Persistence/
     InMemoryPaymentRepository.cs
   Configuration/
+    ServiceCollectionExtensions.cs
 
 tests/PaymentGateway.Api.IntegrationTests/
   Controllers/

@@ -32,7 +32,8 @@ Keep using the framework's `ProblemDetails` types and the `IExceptionHandler` ex
 | `ValidationException` | `400` | Field-level error list |
 | `PaymentNotFoundException` | `404` | "Payment not found" |
 | `AcquiringBankUnavailableException` | `502` | "Acquiring bank is unavailable, please retry" |
-| `TaskCanceledException` (timeout) | `504` | "Request to acquiring bank timed out" |
+| `AcquiringBankTimeoutException` | `504` | "Request to acquiring bank timed out" |
+| `TaskCanceledException` / `TimeoutException` | `504` | "Request to acquiring bank timed out" |
 | anything else | `500` | "An unexpected error occurred" |
 
 Every `ProblemDetails` carries the `traceId`, so a merchant's report can be traced in the logs without exposing anything internal.
@@ -62,6 +63,10 @@ Document explicitly in `README.md` that `Rejected` maps to `400`, produces **no*
 ## Simulator failures
 
 A `503` or a timeout from the simulator means **the outcome is unknown**, not "declined". Never record it as `Declined` — that would tell a merchant their payment failed when it may have succeeded, which is the most damaging bug this codebase can ship. Surface it as `502` or `504`, persist nothing, and log it at `Warning`.
+
+The same reasoning extends past `503`: **every** unsuccessful status becomes `AcquiringBankUnavailableException`, and so does a `200` whose body cannot be read as the documented response. The gateway cannot conclude "declined" from a `400`, a `500`, or unreadable JSON, so it reports an unknown outcome rather than inventing a payment result.
+
+`BankSimulatorClient` translates the resilience pipeline's `TimeoutRejectedException` into `AcquiringBankTimeoutException` at the boundary, keeping Polly types out of `Api` and distinguishing a real gateway timeout from the `TaskCanceledException` a disconnecting merchant produces.
 
 The simulator returns `503` for card numbers ending in zero. Test that path explicitly.
 

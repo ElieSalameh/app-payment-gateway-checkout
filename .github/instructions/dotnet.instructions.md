@@ -48,7 +48,7 @@ applyTo: "**/*.cs,**/*.csproj,**/*.props,**/*.targets"
 
 ## Dependency injection and configuration
 
-- One clear composition root: `Program.cs`, calling `AddPaymentGatewayApi()`, `AddPaymentGatewayApplication()`, and `AddPaymentGatewayInfrastructure()` extension methods so it stays readable. Each layer registers its own types from its own `Configuration/` folder.
+- One clear composition root: `Program.cs`, calling `AddPaymentGatewayApi()`, `AddPaymentGatewayApplication()`, and `AddPaymentGatewayInfrastructure(builder.Configuration)` extension methods so it stays readable. Each layer registers its own types from its own `Configuration/` folder.
 - Constructor injection only. No service locator, no `IServiceProvider` in application code.
 - Choose lifetimes deliberately. The in-memory repository is a thread-safe singleton (`ConcurrentDictionary`). Scoped services must never be injected into singletons.
 - Bind configuration to typed options and validate at startup:
@@ -60,8 +60,9 @@ applyTo: "**/*.cs,**/*.csproj,**/*.props,**/*.targets"
 ## HTTP resilience
 
 - Use `Microsoft.Extensions.Http.Resilience` on the bank client for a bounded timeout and a circuit breaker.
-- **Do not blindly retry the payment request.** It is not idempotent, and a retry risks double-charging. Retrying a connect-phase failure that provably never reached the simulator is defensible; retrying after the request was sent is not. Whatever is chosen, record the reasoning in `README.md`.
-- Set an explicit `HttpClient.Timeout`. A hanging simulator must not hang a merchant.
+- **Retry is disabled.** Processing a payment is not idempotent and no idempotency key is implemented, so retrying a request that already reached the simulator risks double-charging. Disable it with `options.Retry.ShouldHandle` returning `false`; `MaxRetryAttempts = 0` fails the standard options' own validation, which requires at least one. The reasoning is recorded in `README.md`.
+- The pipeline owns the timeout, not `HttpClient`. Set `HttpClient.Timeout` to `Timeout.InfiniteTimeSpan` so it cannot preempt the pipeline: `HttpClient` enforces its timeout outside the handler chain, where the circuit breaker cannot observe it. Drive `AttemptTimeout` and `TotalRequestTimeout` from bound options, and keep `CircuitBreaker.SamplingDuration` at twice the attempt timeout, which the options validate.
+- Translate the pipeline's `TimeoutRejectedException` at the infrastructure boundary. Polly types must not reach `Api`, and `TaskCanceledException` is not a synonym for a gateway timeout — it is also what a disconnecting merchant produces.
 
 ## JSON
 
