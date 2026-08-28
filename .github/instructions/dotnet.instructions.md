@@ -15,7 +15,12 @@ applyTo: "**/*.cs,**/*.csproj,**/*.props,**/*.targets"
 ## General rules
 
 - Prefer clear, intention-revealing code over clever abstraction. Do not add an abstraction until it protects a boundary or is reused.
-- PascalCase for types and public members, camelCase for parameters and locals, `_camelCase` for private fields.
+- PascalCase for types and public members, camelCase for parameters and locals, `_camelCase` for private instance fields.
+- **Every constant carries an underscore prefix, wherever it is declared.** The name keeps its casing and gains the prefix:
+  - private `const` fields and private `static readonly` fields — `_MinimumCardNumberLength`, `_TraceIdExtensionName`, `_SupportedCurrencies`
+  - constants declared inside a method body — `const string _cardNumber = "...";`
+
+  The rule is about the symbol being constant, not about where it is declared. Public members are never prefixed, so `Currency.Gbp` stays as it is, and an ordinary local variable is not a constant, so `var card = ...` stays unprefixed. This diverges from mainstream C# convention on purpose — do not "correct" it back. Enforced by the naming rules in the root `.editorconfig`, with `dotnet_diagnostic.IDE1006.severity = warning` so a violation fails the build rather than being a squiggle only the author sees.
 - **Keep production code free of developer comments.** Express intent through descriptive names for variables, methods, types, and parameters, plus small focused methods and straightforward control flow. See `file-organization.instructions.md`.
 - Keep public API surface small. Types and members are `internal` unless deliberately part of a contract.
 - Prefer immutable data. `record` for request, response, command, and result models. `sealed` on any class not designed for inheritance.
@@ -73,7 +78,7 @@ applyTo: "**/*.cs,**/*.csproj,**/*.props,**/*.targets"
 ## ASP.NET Core behavior
 
 - Controllers stay thin: bind, call the use case, map the result to a status code. No business logic. Authentication is not part of this assessment.
-- Use the framework's routing, DI, logging, and `ProblemDetails` support before writing a custom equivalent.
+- Use the framework's routing, DI, logging, and `ProblemDetails` types before writing a custom equivalent. **Error mapping is the deliberate exception**: exception-to-status-code mapping belongs in our own `GlobalExceptionHandler`, not in framework defaults, so the whole mapping is readable in one file and cheap to adjust. See `error-handling.instructions.md`.
 - Return `ActionResult<T>` with explicit status codes and annotate with `[ProducesResponseType]` so the OpenAPI document matches reality.
 - Route parameters typed as `Guid` so malformed ids fail at model binding.
 - Enable Swagger in Development only.

@@ -20,7 +20,7 @@ Keep the boundary structured so authorization can be added later — threading a
 - Never log, persist in the payment record, return in a response, or include in an exception message: full card numbers (PAN), CVV/CVC, PINs, authentication secrets, access tokens, or provider credentials.
 - The full PAN exists in exactly two places: the inbound request model and the outbound simulator call. Nowhere else, at no point.
 - Retain only the last four digits and the expiry details required for retrieval. Discard the CVV after the authorization call — storing it is a hard PCI DSS violation regardless of environment.
-- Mask once. A single `MaskCardNumber` helper, one implementation, one place to audit.
+- Mask once, in `CardDetails.FromCardNumber` (`PaymentGateway.Domain`). One implementation, one place to audit. Do not add a second masking helper in any other layer.
 - Treat payment and merchant identifiers as sensitive even though they are not card data.
 - Never use real card data. The simulator's documented test cards only.
 - Keep only non-secret configuration defaults in source control. Use `dotnet user-secrets` locally and environment-based injection in deployed environments.

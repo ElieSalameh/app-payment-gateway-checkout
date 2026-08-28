@@ -8,8 +8,8 @@ namespace PaymentGateway.Api.IntegrationTests.Controllers;
 
 public sealed class PaymentsContractTests : IClassFixture<WebApplicationFactory<Program>>
 {
-    private const string ProblemContentType = "application/problem+json";
-    private const string PaymentsRoute = "/payments";
+    private const string _ProblemContentType = "application/problem+json";
+    private const string _PaymentsRoute = "/payments";
 
     private readonly WebApplicationFactory<Program> _factory;
 
@@ -23,10 +23,10 @@ public sealed class PaymentsContractTests : IClassFixture<WebApplicationFactory<
     {
         var client = _factory.CreateClient();
 
-        var response = await client.PostAsJsonAsync(PaymentsRoute, ValidRequestBody());
+        var response = await client.PostAsJsonAsync(_PaymentsRoute, ValidRequestBody());
 
         response.StatusCode.Should().Be(HttpStatusCode.NotImplemented);
-        response.Content.Headers.ContentType!.MediaType.Should().Be(ProblemContentType);
+        response.Content.Headers.ContentType!.MediaType.Should().Be(_ProblemContentType);
     }
 
     [Fact]
@@ -34,10 +34,10 @@ public sealed class PaymentsContractTests : IClassFixture<WebApplicationFactory<
     {
         var client = _factory.CreateClient();
 
-        var response = await client.GetAsync($"{PaymentsRoute}/{Guid.NewGuid()}");
+        var response = await client.GetAsync($"{_PaymentsRoute}/{Guid.NewGuid()}");
 
         response.StatusCode.Should().Be(HttpStatusCode.NotImplemented);
-        response.Content.Headers.ContentType!.MediaType.Should().Be(ProblemContentType);
+        response.Content.Headers.ContentType!.MediaType.Should().Be(_ProblemContentType);
     }
 
     [Fact]
@@ -45,7 +45,7 @@ public sealed class PaymentsContractTests : IClassFixture<WebApplicationFactory<
     {
         var client = _factory.CreateClient();
 
-        var response = await client.GetAsync($"{PaymentsRoute}/not-a-guid");
+        var response = await client.GetAsync($"{_PaymentsRoute}/not-a-guid");
 
         response.StatusCode.Should().Be(HttpStatusCode.NotFound);
     }
@@ -59,10 +59,10 @@ public sealed class PaymentsContractTests : IClassFixture<WebApplicationFactory<
             Encoding.UTF8,
             "application/json");
 
-        var response = await client.PostAsync(PaymentsRoute, unbindableBody);
+        var response = await client.PostAsync(_PaymentsRoute, unbindableBody);
 
         response.StatusCode.Should().Be(HttpStatusCode.BadRequest);
-        response.Content.Headers.ContentType!.MediaType.Should().Be(ProblemContentType);
+        response.Content.Headers.ContentType!.MediaType.Should().Be(_ProblemContentType);
 
         var problem = await ReadProblemAsync(response);
         problem.GetProperty("paymentStatus").GetString().Should().Be("Rejected");
@@ -79,7 +79,7 @@ public sealed class PaymentsContractTests : IClassFixture<WebApplicationFactory<
             Encoding.UTF8,
             "application/json");
 
-        var response = await client.PostAsync(PaymentsRoute, bodyWithUnknownProperty);
+        var response = await client.PostAsync(_PaymentsRoute, bodyWithUnknownProperty);
 
         response.StatusCode.Should().Be(HttpStatusCode.BadRequest);
 
@@ -88,8 +88,8 @@ public sealed class PaymentsContractTests : IClassFixture<WebApplicationFactory<
     }
 
     [Theory]
-    [InlineData(PaymentsRoute, "post")]
-    [InlineData($"{PaymentsRoute}/not-a-guid", "get")]
+    [InlineData(_PaymentsRoute, "post")]
+    [InlineData($"{_PaymentsRoute}/not-a-guid", "get")]
     public async Task ErrorResponses_WhenReturned_CarryATraceId(string route, string method)
     {
         var client = _factory.CreateClient();
@@ -116,13 +116,13 @@ public sealed class PaymentsContractTests : IClassFixture<WebApplicationFactory<
         using var document = JsonDocument.Parse(await response.Content.ReadAsStringAsync());
         var paths = document.RootElement.GetProperty("paths");
 
-        paths.GetProperty(PaymentsRoute).TryGetProperty("post", out var processOperation).Should().BeTrue();
+        paths.GetProperty(_PaymentsRoute).TryGetProperty("post", out var processOperation).Should().BeTrue();
         processOperation.GetProperty("responses").TryGetProperty("201", out _).Should().BeTrue();
         processOperation.GetProperty("responses").TryGetProperty("400", out _).Should().BeTrue();
         processOperation.GetProperty("responses").TryGetProperty("502", out _).Should().BeTrue();
         processOperation.GetProperty("responses").TryGetProperty("504", out _).Should().BeTrue();
 
-        paths.GetProperty($"{PaymentsRoute}/{{paymentId}}").TryGetProperty("get", out var retrieveOperation).Should().BeTrue();
+        paths.GetProperty($"{_PaymentsRoute}/{{paymentId}}").TryGetProperty("get", out var retrieveOperation).Should().BeTrue();
         retrieveOperation.GetProperty("responses").TryGetProperty("200", out _).Should().BeTrue();
         retrieveOperation.GetProperty("responses").TryGetProperty("404", out _).Should().BeTrue();
     }

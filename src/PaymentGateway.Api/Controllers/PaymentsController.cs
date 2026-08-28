@@ -4,8 +4,8 @@ namespace PaymentGateway.Api.Controllers;
 [Route("payments")]
 public sealed class PaymentsController : ControllerBase
 {
-    private const string NotImplementedTitle = "Payment processing is not available yet";
-    private const string NotImplementedDetail = "This release publishes the payment contract only. Processing and retrieval arrive in a later release.";
+    private const string _NotImplementedTitle = "Payment processing is not available yet";
+    private const string _NotImplementedDetail = "This release publishes the payment contract only. Processing and retrieval arrive in a later release.";
 
     [HttpPost]
     [Consumes("application/json")]
@@ -21,7 +21,7 @@ public sealed class PaymentsController : ControllerBase
     public ActionResult<PaymentResponse> GetPayment(Guid paymentId) => NotImplementedYet();
 
     private ObjectResult NotImplementedYet() => Problem(
-        title: NotImplementedTitle,
-        detail: NotImplementedDetail,
+        title: _NotImplementedTitle,
+        detail: _NotImplementedDetail,
         statusCode: StatusCodes.Status501NotImplemented);
 }
