@@ -125,4 +125,35 @@ public sealed class CardDetailsTests
 
         card.HasExpired(new DateTimeOffset(2026, 8, 28, 0, 0, 0, TimeSpan.Zero)).Should().BeTrue();
     }
+
+    [Fact]
+    public void IsExpired_DuringTheExpiryMonth_ReturnsFalse()
+    {
+        CardDetails.IsExpired(expiryMonth: 6, expiryYear: 2025, new DateTimeOffset(2025, 6, 1, 0, 0, 0, TimeSpan.Zero)).Should().BeFalse();
+        CardDetails.IsExpired(expiryMonth: 6, expiryYear: 2025, new DateTimeOffset(2025, 6, 30, 23, 59, 59, TimeSpan.Zero)).Should().BeFalse();
+    }
+
+    [Fact]
+    public void IsExpired_OnceTheExpiryMonthHasPassed_ReturnsTrue()
+    {
+        CardDetails.IsExpired(expiryMonth: 6, expiryYear: 2025, new DateTimeOffset(2025, 7, 1, 0, 0, 0, TimeSpan.Zero)).Should().BeTrue();
+    }
+
+    [Fact]
+    public void IsExpired_AtTheLatestSupportedExpiry_DoesNotOverflow()
+    {
+        CardDetails.IsExpired(expiryMonth: 12, expiryYear: 9999, new DateTimeOffset(2025, 6, 15, 0, 0, 0, TimeSpan.Zero)).Should().BeFalse();
+    }
+
+    [Theory]
+    [InlineData(0, 2030)]
+    [InlineData(13, 2030)]
+    [InlineData(6, 999)]
+    [InlineData(6, 10000)]
+    public void IsExpired_WhenTheExpiryIsOutOfRange_ThrowsArgumentOutOfRangeException(int expiryMonth, int expiryYear)
+    {
+        var isExpired = () => CardDetails.IsExpired(expiryMonth, expiryYear, new DateTimeOffset(2025, 6, 15, 0, 0, 0, TimeSpan.Zero));
+
+        isExpired.Should().Throw<ArgumentOutOfRangeException>();
+    }
 }

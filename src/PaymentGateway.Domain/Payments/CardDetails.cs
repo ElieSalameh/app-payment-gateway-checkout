@@ -32,15 +32,22 @@ public sealed record CardDetails
         return new CardDetails(MaskCardNumber(cardNumber), expiryMonth, expiryYear);
     }
 
-    public bool HasExpired(DateTimeOffset asOf) => asOf >= FirstMomentAfterExpiry();
+    public static bool IsExpired(int expiryMonth, int expiryYear, DateTimeOffset asOf)
+    {
+        GuardExpiry(expiryMonth, expiryYear);
+
+        var firstDayOfExpiryMonth = new DateTimeOffset(expiryYear, expiryMonth, 1, 0, 0, 0, TimeSpan.Zero);
+        var firstDayOfCurrentMonth = new DateTimeOffset(asOf.UtcDateTime.Year, asOf.UtcDateTime.Month, 1, 0, 0, 0, TimeSpan.Zero);
+
+        return firstDayOfCurrentMonth > firstDayOfExpiryMonth;
+    }
+
+    public bool HasExpired(DateTimeOffset asOf) => IsExpired(ExpiryMonth, ExpiryYear, asOf);
 
     public override string ToString() => $"**** **** **** {LastFourDigits}";
 
     private static string MaskCardNumber(string cardNumber) =>
         cardNumber[^_LastFourDigitsLength..];
-
-    private DateTimeOffset FirstMomentAfterExpiry() =>
-        new DateTimeOffset(ExpiryYear, ExpiryMonth, 1, 0, 0, 0, TimeSpan.Zero).AddMonths(1);
 
     private static void GuardCardNumber(string cardNumber)
     {

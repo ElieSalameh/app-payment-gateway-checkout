@@ -27,7 +27,7 @@ tests/
 
 The brief's warning about over-engineering targets speculative **features**, not assembly boundaries. Do not add a real database, queue, outbox, webhook system, payment-provider SDK, MediatR or another mediator, a CQRS bus, AutoMapper, event sourcing, or an idempotency protocol. The README explicitly allows a test-double repository.
 
-The repository currently contains only `PaymentGateway.Api`. Grow into the structure above as each layer gains its first real type — create a project when it has something to hold, not in advance.
+All four source projects now exist, along with `Domain.Tests`, `Application.Tests`, `Infrastructure.Tests`, and `Api.IntegrationTests`. Keep growing them the same way — add a folder or a project when it has something real to hold, not in advance.
 
 ## Dependency direction
 
@@ -54,7 +54,7 @@ The repository currently contains only `PaymentGateway.Api`. Grow into the struc
 - A stored `Payment` is exactly `Authorized` or `Declined`. `Rejected` is **not** a domain status: the brief says a rejected request creates no payment, so there is nothing to store and nothing to give a status to. `Rejected` exists only as the gateway's `400` response. Do not add capture, refund, void, or other transitions.
 - `Money` is a `long` count of minor units paired with a `Currency`, and must be greater than zero. `Currency` owns the supported set — `GBP`, `USD`, `EUR` — and parsing is case-insensitive but always yields the canonical uppercase code.
 - Domain guards throw `ArgumentException` / `ArgumentOutOfRangeException`, because by the time a value reaches the domain it has already passed validation; a violation is a programmer error, not a merchant error. Guard messages state the rule and never echo the rejected value, so a card number cannot leak through an exception.
-- Time never comes from inside the domain. A rule that needs the clock takes it as a parameter, as `CardDetails.HasExpired(DateTimeOffset asOf)` does, which keeps the domain deterministic and leaves `TimeProvider` at the application boundary.
+- Time never comes from inside the domain. A rule that needs the clock takes it as a parameter, as `CardDetails.HasExpired(DateTimeOffset asOf)` does, which keeps the domain deterministic and leaves `TimeProvider` at the application boundary. Its static sibling `CardDetails.IsExpired(expiryMonth, expiryYear, asOf)` lets the validator ask the same question before a `CardDetails` exists, so expiry has exactly one definition: a card expires once the calendar has moved past its expiry month, and a card expiring this month is still valid until the month ends.
 - Keep simulator status codes and retry behavior out of the domain; map them to a stable internal model at the edge.
 - Do not add domain events for two synchronous use cases.
 
@@ -62,7 +62,7 @@ The repository currently contains only `PaymentGateway.Api`. Grow into the struc
 
 - Map HTTP request models to application commands, and application results to HTTP response models. Never return a domain entity from a controller.
 - Do not pass `HttpContext`, `ControllerBase`, provider SDK objects, or `IConfiguration` into application or domain code. Bind typed options instead.
-- Keep the in-memory repository behind `IPaymentRepository` so it can be replaced without touching a use case.
+- Keep the in-memory repository behind `IPaymentRepository` so it can be replaced without touching a use case. The port is `Add(Payment, CancellationToken)` and `GetById(PaymentId, CancellationToken)` — it takes `PaymentId`, never a raw `Guid`, because the repository boundary is the mix-up `PaymentId` exists to prevent. `Add` throws on an id that is already stored rather than overwriting a recorded charge, and both methods honour their `CancellationToken`.
 - Treat the simulator as unreliable: bounded HTTP timeout, `503` mapped to a clear dependency failure, no false authorization or decline. Do not retry the non-idempotent payment request — a retry risks double-charging, and idempotency is not implemented.
 
 ## Feature organization

@@ -45,7 +45,7 @@ tests/
 
 ## What to test
 
-**Validation** — every rule, at its boundaries: 13/14/19/20-character card numbers, month 0/1/12/13, expiry in the past, expiry this month, expiry next month, 2/3/4/5-character CVV, unsupported currency, zero and negative amounts, non-numeric card number and CVV. This is the largest suite in the project and should be table-driven with `[Theory]` and `[InlineData]`.
+**Validation** — every rule, at its boundaries: 13/14/19/20-character card numbers, month 0/1/12/13, expiry in the past, expiry this month, expiry next month, 2/3/4/5-character CVV, unsupported currency, zero and negative amounts, non-numeric card number and CVV. This is the largest suite in the project and should be table-driven with `[Theory]` and `[InlineData]`. Expiry this month is valid and expiry last month is not, so pin both instants — the last moment of the expiry month and the first moment after it — with `FakeTimeProvider`. Also assert that an out-of-range month reports only itself and does not surface an expiry-date error, and that no error message contains the submitted card number or CVV.
 
 **Outcome mapping** — invalid input returns `Rejected` **and never calls the bank**; an odd-ending card becomes `Authorized`; a non-zero even-ending card becomes `Declined`; a zero-ending card or a `503` becomes a dependency failure, not a payment result.
 
