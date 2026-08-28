@@ -24,7 +24,7 @@ applyTo: "**/*.cs,**/*.csproj,**/*.props,**/*.targets"
 - **Keep production code free of developer comments.** Express intent through descriptive names for variables, methods, types, and parameters, plus small focused methods and straightforward control flow. See `file-organization.instructions.md`.
 - Keep public API surface small. Types and members are `internal` unless deliberately part of a contract.
 - Prefer immutable data. `record` for request, response, command, and result models. `sealed` on any class not designed for inheritance.
-- `required` properties on models the server constructs — responses, commands, results — so the compiler enforces construction. **Not** on the inbound `ProcessPaymentRequest`: presence is a validation rule, and every rule that produces `Rejected` belongs to the FluentValidation validator in `Application` where it cannot be bypassed by a second entry point. Inbound properties are nullable with no validation attributes, so a missing field yields a field-level error rather than a System.Text.Json binding failure.
+- `required` properties on models the server constructs — responses and results — so the compiler enforces construction. **Not** on the inbound `ProcessPaymentRequest`, and not on the `ProcessPaymentCommand` it maps to: presence is a validation rule, and every rule that produces `Rejected` belongs to the FluentValidation validator in `Application` where it cannot be bypassed by a second entry point. Inbound properties are nullable with no validation attributes all the way to the command, so a missing field yields a field-level error rather than a System.Text.Json binding failure or a construction-time crash.
 - File-scoped namespaces. A single `GlobalUsings.cs` per project rather than scattered `using` blocks.
 - Target-typed `new()`, collection expressions, and pattern matching over long `if`/`else` chains.
 - Guard clauses at the boundary where input enters.
@@ -48,7 +48,7 @@ applyTo: "**/*.cs,**/*.csproj,**/*.props,**/*.targets"
 
 ## Dependency injection and configuration
 
-- One clear composition root: `Program.cs`, calling `AddPaymentGatewayApi()` and `AddPaymentGatewayInfrastructure()` extension methods so it stays readable. Each layer registers its own types from its own `Configuration/` folder.
+- One clear composition root: `Program.cs`, calling `AddPaymentGatewayApi()`, `AddPaymentGatewayApplication()`, and `AddPaymentGatewayInfrastructure()` extension methods so it stays readable. Each layer registers its own types from its own `Configuration/` folder.
 - Constructor injection only. No service locator, no `IServiceProvider` in application code.
 - Choose lifetimes deliberately. The in-memory repository is a thread-safe singleton (`ConcurrentDictionary`). Scoped services must never be injected into singletons.
 - Bind configuration to typed options and validate at startup:
@@ -73,7 +73,11 @@ applyTo: "**/*.cs,**/*.csproj,**/*.props,**/*.targets"
 ## Validation
 
 - **FluentValidation**, on the application command, in `Application`. Do not mix DataAnnotations and FluentValidation on the same type.
-- The rules, all of which must be enforced: card number required, 14–19 characters, digits only; expiry month required, 1–12; expiry year required with month and year combined strictly in the future; currency required, exactly 3 characters, one of the three supported; amount required, integer, greater than zero; CVV required, 3–4 characters, digits only.
+- The command exposes every field as nullable — it is untrusted merchant input, and "required" is one of the rules the validator must be able to fail.
+- Rule-level cascade is `CascadeMode.Stop`, so each field reports the first rule it breaks instead of a pile of consequential errors.
+- Validation messages state the rule and never echo the submitted value, so a card number or CVV cannot escape through an error body.
+- The combined expiry rule lives on `expiryYear`, runs only once the month is within 1–12 so an out-of-range month cannot crash the date arithmetic, and delegates to `CardDetails.IsExpired(expiryMonth, expiryYear, asOf)`. That domain method is the single definition of expiry: a card expires once the calendar has moved past its expiry month, so a card expiring this month is still valid until the month ends. Never restate that arithmetic in the validator.
+- The rules, all of which must be enforced: card number required, 14–19 characters, digits only; expiry month required, 1–12; expiry year required, a four digit year, with the month and year combined not yet passed; currency required, exactly 3 characters, one of the three supported; amount required, integer, greater than zero; CVV required, 3–4 characters, digits only.
 
 ## ASP.NET Core behavior
 

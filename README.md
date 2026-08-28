@@ -1,5 +1,7 @@
 # Payment Gateway Checkout
 
+[![Build](https://github.com/ElieSalameh/app-payment-gateway-checkout/actions/workflows/build.yml/badge.svg)](https://github.com/ElieSalameh/app-payment-gateway-checkout/actions/workflows/build.yml)
+
 ## Overview
 
 This project is a .NET 8 Web API for a payment gateway assessment. It will allow a merchant to submit a card payment for authorization and retrieve the details of a previously created payment.
@@ -194,7 +196,8 @@ Important scenarios include:
 
 ### Prerequisites
 
-- .NET 8 SDK.
+- .NET 8 SDK, to build and run the projects — every project targets `net8.0`.
+- .NET SDK **9.0.200 or newer**, additionally, because the solution file is `PaymentGatewayCheckout.slnx`. The `.slnx` format is only understood by that SDK version onwards, so an older CLI fails at `dotnet restore` before anything is compiled. Installing both side by side is supported and is what CI does. To build without it, pass the project files directly instead of the solution.
 - Docker, if running the bank simulator locally.
 
 ### Start the bank simulator
@@ -223,6 +226,8 @@ From the repository root:
 ```powershell
 dotnet test .\PaymentGatewayCheckout.slnx
 ```
+
+The build workflow runs the same command on Linux for every pull request, so the badge above reflects the suite independently of any one machine.
 
 ## Security and data handling
 

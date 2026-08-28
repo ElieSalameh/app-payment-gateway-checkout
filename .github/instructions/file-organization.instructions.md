@@ -57,9 +57,13 @@ src/PaymentGateway.Api/
 src/PaymentGateway.Application/
   Payments/
     ProcessPayment/
+      ProcessPaymentCommand.cs
+      ProcessPaymentValidator.cs
     GetPayment/
   Abstractions/
   Exceptions/
+  Configuration/
+    ServiceCollectionExtensions.cs
 
 src/PaymentGateway.Domain/
   Payments/
