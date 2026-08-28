@@ -1,5 +1,4 @@
 using System.Net;
-using System.Net.Http.Json;
 using System.Text;
 using System.Text.Json;
 using Microsoft.AspNetCore.Mvc.Testing;
@@ -10,34 +9,14 @@ public sealed class PaymentsContractTests : IClassFixture<WebApplicationFactory<
 {
     private const string _ProblemContentType = "application/problem+json";
     private const string _PaymentsRoute = "/payments";
+    private const string _UnbindableBody = """{"cardNumber":"2222405343248877","expiryMonth":"not-a-month"}""";
+    private const string _BodyWithUnknownProperty = """{"cardNumber":"2222405343248877","merchantId":"smuggled"}""";
 
     private readonly WebApplicationFactory<Program> _factory;
 
     public PaymentsContractTests(WebApplicationFactory<Program> factory)
     {
         _factory = factory;
-    }
-
-    [Fact]
-    public async Task ProcessPayment_WhenGivenAValidBody_RoutesToThePaymentsEndpoint()
-    {
-        var client = _factory.CreateClient();
-
-        var response = await client.PostAsJsonAsync(_PaymentsRoute, ValidRequestBody());
-
-        response.StatusCode.Should().Be(HttpStatusCode.NotImplemented);
-        response.Content.Headers.ContentType!.MediaType.Should().Be(_ProblemContentType);
-    }
-
-    [Fact]
-    public async Task GetPayment_WhenGivenAPaymentId_RoutesToThePaymentsEndpoint()
-    {
-        var client = _factory.CreateClient();
-
-        var response = await client.GetAsync($"{_PaymentsRoute}/{Guid.NewGuid()}");
-
-        response.StatusCode.Should().Be(HttpStatusCode.NotImplemented);
-        response.Content.Headers.ContentType!.MediaType.Should().Be(_ProblemContentType);
     }
 
     [Fact]
@@ -54,12 +33,8 @@ public sealed class PaymentsContractTests : IClassFixture<WebApplicationFactory<
     public async Task ProcessPayment_WhenBodyCannotBeBound_ReturnsRejectedValidationProblem()
     {
         var client = _factory.CreateClient();
-        var unbindableBody = new StringContent(
-            """{"cardNumber":"2222405343248877","expiryMonth":"not-a-month"}""",
-            Encoding.UTF8,
-            "application/json");
 
-        var response = await client.PostAsync(_PaymentsRoute, unbindableBody);
+        var response = await client.PostAsync(_PaymentsRoute, JsonBody(_UnbindableBody));
 
         response.StatusCode.Should().Be(HttpStatusCode.BadRequest);
         response.Content.Headers.ContentType!.MediaType.Should().Be(_ProblemContentType);
@@ -74,12 +49,8 @@ public sealed class PaymentsContractTests : IClassFixture<WebApplicationFactory<
     public async Task ProcessPayment_WhenBodyContainsAnUnknownProperty_ReturnsRejectedValidationProblem()
     {
         var client = _factory.CreateClient();
-        var bodyWithUnknownProperty = new StringContent(
-            """{"cardNumber":"2222405343248877","merchantId":"smuggled"}""",
-            Encoding.UTF8,
-            "application/json");
 
-        var response = await client.PostAsync(_PaymentsRoute, bodyWithUnknownProperty);
+        var response = await client.PostAsync(_PaymentsRoute, JsonBody(_BodyWithUnknownProperty));
 
         response.StatusCode.Should().Be(HttpStatusCode.BadRequest);
 
@@ -95,7 +66,7 @@ public sealed class PaymentsContractTests : IClassFixture<WebApplicationFactory<
         var client = _factory.CreateClient();
 
         var response = method == "post"
-            ? await client.PostAsJsonAsync(route, ValidRequestBody())
+            ? await client.PostAsync(route, JsonBody(_UnbindableBody))
             : await client.GetAsync(route);
 
         var problem = await ReadProblemAsync(response);
@@ -146,19 +117,12 @@ public sealed class PaymentsContractTests : IClassFixture<WebApplicationFactory<
         paymentResponseProperties.TryGetProperty("cvv", out _).Should().BeFalse();
     }
 
-    private static ProcessPaymentRequest ValidRequestBody() => new()
-    {
-        CardNumber = "2222405343248877",
-        ExpiryMonth = 4,
-        ExpiryYear = 2030,
-        Currency = "GBP",
-        Amount = 100,
-        Cvv = "123"
-    };
+    private static StringContent JsonBody(string body) => new(body, Encoding.UTF8, "application/json");
 
     private static async Task<JsonElement> ReadProblemAsync(HttpResponseMessage response)
     {
         using var document = JsonDocument.Parse(await response.Content.ReadAsStringAsync());
+
         return document.RootElement.Clone();
     }
 }

@@ -4,4 +4,7 @@ global using Microsoft.AspNetCore.Http;
 global using Microsoft.Extensions.Hosting;
 global using PaymentGateway.Api.Contracts.Requests;
 global using PaymentGateway.Api.Contracts.Responses;
+global using PaymentGateway.Api.IntegrationTests.Abstractions;
+global using PaymentGateway.Application.Abstractions;
+global using PaymentGateway.Application.Exceptions;
 global using Xunit;

@@ -61,7 +61,9 @@ All four source projects now exist, along with `Domain.Tests`, `Application.Test
 
 ## Boundaries
 
-- Map HTTP request models to application commands, and application results to HTTP response models. Never return a domain entity from a controller.
+- Map HTTP request models to application commands, and application results to HTTP response models. Never return a domain entity from a controller. `PaymentsController` holds nothing but that mapping and the handler calls; it never names `Payment`, `Money`, or `Currency`.
+- The wire and domain `PaymentStatus` enums share a name on purpose — each is right in its own layer. The controller aliases the domain one and maps between them in an exhaustive switch, which is the seam where the published contract can later diverge from the domain.
+- A processed payment is `201 Created` with a `Location` header, `Declined` included: the bank answered and the payment was stored, so the status code describes the resource, not the cardholder's outcome. `Guid.Empty` is answered as `404` before it reaches `PaymentId.From`, which refuses it by design.
 - Do not pass `HttpContext`, `ControllerBase`, provider SDK objects, or `IConfiguration` into application or domain code. Bind typed options instead.
 - Keep the in-memory repository behind `IPaymentRepository` so it can be replaced without touching a use case. The port is `Add(Payment, CancellationToken)` and `GetById(PaymentId, CancellationToken)` — it takes `PaymentId`, never a raw `Guid`, because the repository boundary is the mix-up `PaymentId` exists to prevent. `Add` throws on an id that is already stored rather than overwriting a recorded charge, and both methods honour their `CancellationToken`.
 - Treat the simulator as unreliable: bounded HTTP timeout, `503` mapped to a clear dependency failure, no false authorization or decline. Do not retry the non-idempotent payment request — a retry risks double-charging, and idempotency is not implemented.

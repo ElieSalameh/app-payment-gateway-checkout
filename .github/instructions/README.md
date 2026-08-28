@@ -198,7 +198,7 @@ A bank simulator is provided. The simulator provides responses based on the requ
 <p align="right">(<a href="#readme-top">back to top</a>)</p>
 
 #### Starting the simulator
-To start the simulator, run `docker-compose up`
+To start the simulator, run `docker-compose -f docker/docker-compose.yml up`
 
 <p align="right">(<a href="#readme-top">back to top</a>)</p>
 

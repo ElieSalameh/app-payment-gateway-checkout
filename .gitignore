@@ -49,3 +49,6 @@ publish/
 # Local Copilot instructions
 .github/instructions/workflow.instructions.md
 .github/copilot-instructions.md
+
+# Mountebank runtime artifact, written when the simulator runs outside Docker
+mb.pid
