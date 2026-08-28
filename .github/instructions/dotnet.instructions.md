@@ -50,6 +50,7 @@ applyTo: "**/*.cs,**/*.csproj,**/*.props,**/*.targets"
 
 - One clear composition root: `Program.cs`, calling `AddPaymentGatewayApi()`, `AddPaymentGatewayApplication()`, and `AddPaymentGatewayInfrastructure(builder.Configuration)` extension methods so it stays readable. Each layer registers its own types from its own `Configuration/` folder.
 - Constructor injection only. No service locator, no `IServiceProvider` in application code.
+- Register against an interface where the interface exists to be substituted. `IAcquiringBankClient` and `IPaymentRepository` qualify; the use case handlers do not, so `ProcessPaymentHandler` and `GetPaymentHandler` are registered scoped as their own concrete types rather than behind a one-implementation interface.
 - Choose lifetimes deliberately. The in-memory repository is a thread-safe singleton (`ConcurrentDictionary`). Scoped services must never be injected into singletons.
 - Bind configuration to typed options and validate at startup:
   `services.AddOptions<BankSimulatorOptions>().Bind(...).ValidateDataAnnotations().ValidateOnStart();`

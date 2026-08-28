@@ -6,6 +6,8 @@ namespace PaymentGateway.Api.Middleware;
 
 internal sealed class GlobalExceptionHandler : IExceptionHandler
 {
+    private const string _PaymentNotFoundTitle = "Payment not found";
+    private const string _PaymentNotFoundDetail = "No payment was found for the supplied id.";
     private const string _AcquiringBankUnavailableTitle = "Acquiring bank is unavailable";
     private const string _AcquiringBankUnavailableDetail = "The acquiring bank is unavailable, please retry.";
     private const string _AcquiringBankTimeoutTitle = "Acquiring bank timed out";
@@ -47,6 +49,10 @@ internal sealed class GlobalExceptionHandler : IExceptionHandler
     private static ProblemDetails Describe(Exception exception) => exception switch
     {
         ValidationException validationException => PaymentRejection.Describe(DescribeFailures(validationException)),
+        PaymentNotFoundException => Describe(
+            StatusCodes.Status404NotFound,
+            _PaymentNotFoundTitle,
+            _PaymentNotFoundDetail),
         AcquiringBankUnavailableException => Describe(
             StatusCodes.Status502BadGateway,
             _AcquiringBankUnavailableTitle,
