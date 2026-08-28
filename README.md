@@ -149,6 +149,27 @@ Simulator behavior:
 
 The simulator URL must be configurable. Do not call a live acquiring bank.
 
+### Bank client decisions
+
+The `BankSimulator` configuration section binds to `BankSimulatorOptions` and is validated at startup, so a missing or malformed address fails the app at boot rather than on the first payment:
+
+```json
+"BankSimulator": {
+  "BaseAddress": "http://localhost:8080",
+  "TimeoutInSeconds": 10
+}
+```
+
+**Retry is disabled, deliberately.** Processing a payment is not idempotent and this gateway implements no idempotency key, so a retry of a request that already reached the simulator could charge a cardholder twice. A double charge is far worse than asking a merchant to resubmit, so the gateway retries nothing and reports `502` or `504` instead, leaving the decision with the caller. The circuit breaker and the timeout from `Microsoft.Extensions.Http.Resilience` are kept.
+
+**The resilience pipeline owns the timeout, not `HttpClient`.** `HttpClient.Timeout` is set to infinite on purpose: it is enforced outside the handler chain, so a timeout raised there is invisible to the circuit breaker and could never open it. The pipeline's attempt and total timeouts come from `TimeoutInSeconds`.
+
+**Any unsuccessful response is an unknown outcome.** Only a `200` carrying the documented body produces `Authorized` or `Declined`. A `503`, any other error status, an unreachable host, or a `200` whose body cannot be read all raise a dependency failure and store nothing. The gateway never infers `Declined` from a transport failure, because telling a merchant a payment failed when it may have succeeded is the most damaging error it could make.
+
+**A timeout is distinguished from a cancellation.** The pipeline raises Polly's `TimeoutRejectedException`, which the client translates into `AcquiringBankTimeoutException` at the infrastructure boundary. That keeps Polly types out of the API layer and avoids treating `TaskCanceledException` — which is also what a merchant disconnecting produces — as a gateway timeout.
+
+The full card number and CVV exist only in the request DTO and the outbound call to the simulator. `AuthorizationRequest` and the bank's own request DTO both override `ToString()` to expose neither, so an accidental log of either object cannot leak them.
+
 ## Architecture
 
 The implementation should use the smallest architecture that keeps responsibilities and testing clear:
@@ -251,8 +272,8 @@ The following are not required for this assessment:
 ## Implementation roadmap
 
 - [x] Define the public request, response, and error contracts.
-- [ ] Implement payment validation and rejected behavior.
-- [ ] Implement the configurable bank simulator client.
+- [x] Implement payment validation.
+- [x] Implement the configurable bank simulator client.
 - [ ] Map authorized, declined, and dependency-failure outcomes.
 - [ ] Add the in-memory payment repository and retrieval endpoint.
 - [ ] Add unit and integration tests.

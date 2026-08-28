@@ -1,5 +1,14 @@
+global using System.Net;
+global using System.Text;
+global using System.Text.Json;
 global using FluentAssertions;
+global using Microsoft.Extensions.Logging.Abstractions;
+global using PaymentGateway.Application.Abstractions;
+global using PaymentGateway.Application.Exceptions;
 global using PaymentGateway.Domain.Payments;
 global using PaymentGateway.Domain.Shared;
+global using PaymentGateway.Infrastructure.Bank;
 global using PaymentGateway.Infrastructure.Persistence;
+global using PaymentGateway.Infrastructure.Tests.Bank;
+global using Polly.Timeout;
 global using Xunit;

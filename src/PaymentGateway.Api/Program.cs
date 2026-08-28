@@ -6,7 +6,7 @@ var builder = WebApplication.CreateBuilder(args);
 
 builder.Services.AddPaymentGatewayApi();
 builder.Services.AddPaymentGatewayApplication();
-builder.Services.AddPaymentGatewayInfrastructure();
+builder.Services.AddPaymentGatewayInfrastructure(builder.Configuration);
 
 var app = builder.Build();
 
