@@ -3,43 +3,58 @@ applyTo: "**/*.cs,**/*.json,**/*.http"
 ---
 # API and payment security for this assessment
 
-Use `.github/project-context/project-scope.md` as the functional source of truth. Apply strong handling of payment data without adding an authentication, webhook, or production compliance platform that the assessment does not require.
+`CLAUDE.md` section 9 is canonical. `.github/project-context/project-scope.md` is the functional source of truth. Apply strong handling of payment data without building an authentication, webhook, or compliance platform the assessment does not require.
+
+## Scope: built versus documented
+
+The brief lists two functional requirements and explicitly discourages over-engineering. Authentication, merchant identity, and rate limiting are not stated requirements.
+
+**Implement.** Card-data hygiene, boundary validation, bounded timeouts, safe error responses, log redaction, HTTPS configuration outside local development. These are what a payments reviewer actually checks, and they are all in scope.
+
+**Document, do not build.** A `## Production considerations` section in `README.md` covering: API key or mTLS merchant authentication with `CryptographicOperations.FixedTimeEquals` comparison rather than `==`; per-merchant payment scoping so one merchant cannot read another's payments; rate limiting via the built-in .NET 8 limiter returning `429` with `Retry-After`; idempotency keys on the process endpoint; secret storage and rotation with separate credentials per environment; and provider-hosted fields or tokenization so raw PAN never reaches the API.
+
+Keep the boundary structured so authorization can be added later — threading a merchant identifier through the command and storing it on the payment costs nothing and makes the follow-up small. Do not add the authentication scheme itself. Half an identity system reads worse in review than a clearly documented absent one.
 
 ## Sensitive payment data
 
-- Never log, persist in the payment record, return, or include in exceptions full card numbers (PAN), CVV/CVC, PINs, authentication secrets, access tokens, or provider credentials.
-- This assessment's simulator accepts card test data, so pass the data only for the authorization request, retain only the last four digits and required expiry details, and discard CVV after the call. Never use real card data.
-- In a production design, prefer provider-hosted fields or tokenization so raw card data does not enter the API. Keep the assessment implementation consistent with the simulator contract without pretending it is production PCI compliance.
-- Mask identifiers when they must be displayed, for example only the last four digits of a card token. Treat payment and customer identifiers as sensitive even when they are not card data.
-- Use an approved secrets store or environment-based secret injection in deployed environments. Keep only non-secret configuration defaults in source control.
-- Rotate credentials and use separate credentials for development, testing, staging, and production.
+- Never log, persist in the payment record, return in a response, or include in an exception message: full card numbers (PAN), CVV/CVC, PINs, authentication secrets, access tokens, or provider credentials.
+- The full PAN exists in exactly two places: the inbound request model and the outbound simulator call. Nowhere else, at no point.
+- Retain only the last four digits and the expiry details required for retrieval. Discard the CVV after the authorization call — storing it is a hard PCI DSS violation regardless of environment.
+- Mask once. A single `MaskCardNumber` helper, one implementation, one place to audit.
+- Treat payment and merchant identifiers as sensitive even though they are not card data.
+- Never use real card data. The simulator's documented test cards only.
+- Keep only non-secret configuration defaults in source control. Use `dotnet user-secrets` locally and environment-based injection in deployed environments.
 
 ## Request safety
 
-- Authentication and merchant identity are not part of the stated assessment requirements. Do not invent a full identity system; keep the API boundary structured so authorization can be added later.
-- Validate request size, content type, required fields, ranges, card digits, expiry, supported currency codes, amount, CVV, and payment identifiers at the API boundary.
-- Do not trust client-provided calculated values or ownership fields if those fields are introduced later; resolve authoritative values from server-side state.
-- Use HTTPS in every non-local environment and configure secure cookies, HSTS, and appropriate security headers when cookies or browser clients are involved.
-- Rate limiting and abuse controls are production follow-ups, not reasons to add unrelated infrastructure to this assessment.
+- Validate at the boundary and treat every request as hostile: content type, request size, required fields, card digits and length, expiry month and combined expiry date, supported currency, integer amount, CVV length and digits, and payment identifier format.
+- Route parameters typed as `Guid` so malformed ids are rejected before any code runs.
+- Set a low `MaxRequestBodySize` — a payment request is tiny.
+- Reject unknown JSON properties rather than silently ignoring them.
+- Do not trust client-supplied calculated values or ownership fields; resolve authoritative values server-side.
+- Use HTTPS in every non-local environment, with HSTS. The simulator is plain HTTP locally — say so in `README.md` rather than pretending otherwise.
+- CORS stays closed. A payment API is not called from a browser.
+- Remove the `Server` header.
 
 ## Payment commands
 
-- Idempotency is a useful production consideration, but it is not a stated assessment requirement. Do not add an idempotency protocol unless it is implemented completely and documented.
-- Store only the safe payment fields required for retrieval in the approved in-memory/test-double repository. Treat a timeout or `503` after submission as a dependency failure, not as proof that the payment was declined.
-- Use decimal-safe money types or integer minor units with an explicit currency. Never use binary floating point for monetary calculations.
-- Validate allowed amount, currency, and payment status on the server. Do not accept calculated totals from an untrusted client without recomputing or verifying them.
-- Configure a bounded timeout for the simulator and do not blindly retry its non-idempotent payment request.
+- Use integer minor units with an explicit currency. Never binary floating point for money.
+- Store only the safe fields required for retrieval, in the approved in-memory repository.
+- Configure a bounded timeout for the simulator and **do not blindly retry its non-idempotent payment request** — a retry risks double-charging.
+- A timeout or `503` after submission is a **dependency failure**, not proof of decline. Never record it as `Declined` and never tell the merchant a payment failed when it may have succeeded.
+- Validate allowed amount, currency, and status server-side.
 
-## Out-of-scope integrations
+## Out of scope
 
-- Webhooks, callbacks, capture, refunds, recurring billing, and reconciliation jobs are outside this assessment. Do not create endpoints or security flows for them without a new requirement.
+Webhooks, callbacks, capture, refunds, voids, recurring billing, and reconciliation jobs are outside this assessment. Do not create endpoints or security flows for them without a new requirement.
 
 ## Errors and observability
 
-- Return stable, client-safe error codes and `ProblemDetails`; do not return provider credentials, raw provider payloads, stack traces, SQL, or internal hostnames.
-- Use correlation IDs and structured logs, but define an allowlist of fields for payment logs. Redact sensitive headers, request bodies, authorization values, and query strings.
-- Keep any audit or diagnostic data limited to safe payment identifiers, status, result, and correlation data. Do not expose detailed dependency diagnostics publicly.
+- Return stable, client-safe error codes and `ProblemDetails`. Never return provider credentials, raw provider payloads, stack traces, SQL, or internal hostnames. See `error-handling.instructions.md`.
+- Use correlation identifiers and structured logs with an **allowlist** of fields for payment logs. Redact sensitive headers, bodies, authorization values, and query strings. See `logging.instructions.md`.
+- Keep audit and diagnostic data limited to safe payment identifiers, status, result, and correlation data. Do not expose dependency diagnostics publicly.
+- Swagger in Development only.
 
 ## Verification checklist
 
-Before merging an API or payment change, verify input validation, simulator boundary handling, secret handling, log redaction, card masking, timeout behavior, safe error responses, and the relevant payment-data risk. Add a regression test for each security defect or business-risk scenario fixed.
+Before merging an API or payment change, verify: input validation, simulator boundary handling, secret handling, log redaction, card masking, timeout behavior, safe error responses, and the specific payment-data risk the change touches. Add a regression test for every security defect or business-risk scenario fixed.
