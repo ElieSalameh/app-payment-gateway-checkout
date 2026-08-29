@@ -69,7 +69,7 @@ Do not test framework behavior, private methods, trivial property accessors, or 
 ## Integration safety
 
 - `WebApplicationFactory<Program>` rather than starting an external process.
-- Reset the in-memory repository between tests; never share mutable state accidentally.
+- Never share mutable state between tests. The in-memory repository is isolated by building a client per test through `WithWebHostBuilder`, which yields a new service provider and a new singleton — not by adding a reset method to `IPaymentRepository`, which would be production surface existing only for the tests.
 - Use the documented simulator test cards only. Never real card numbers, production tokens, or live provider endpoints.
 - The default test run must be safe offline. External calls are explicit and opt-in.
 - Do not assert on unstable values — timestamps, generated ids, provider messages — unless the test controls or normalizes them.

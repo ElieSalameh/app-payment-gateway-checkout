@@ -47,16 +47,6 @@ public sealed class GetPaymentHandlerTests
         await handle.Should().ThrowAsync<PaymentNotFoundException>();
     }
 
-    [Fact]
-    public async Task Handle_WhenTheQueryIsNull_ThrowsArgumentNullException()
-    {
-        var handler = HandlerFor(new FakePaymentRepository());
-
-        var handle = () => handler.Handle(null!, CancellationToken.None);
-
-        await handle.Should().ThrowAsync<ArgumentNullException>();
-    }
-
     private static GetPaymentHandler HandlerFor(FakePaymentRepository repository) =>
         new(repository, NullLogger<GetPaymentHandler>.Instance);
 

@@ -7,6 +7,7 @@ namespace PaymentGateway.Api.Middleware;
 
 internal sealed class GlobalExceptionHandler : IExceptionHandler
 {
+    private const string _RejectedFieldSeparator = ", ";
     private const string _PaymentNotFoundTitle = "Payment not found";
     private const string _PaymentNotFoundDetail = "No payment was found for the supplied id.";
     private const string _AcquiringBankUnavailableTitle = "Acquiring bank is unavailable";
@@ -21,9 +22,6 @@ internal sealed class GlobalExceptionHandler : IExceptionHandler
 
     public GlobalExceptionHandler(IProblemDetailsService problemDetailsService, ILogger<GlobalExceptionHandler> logger)
     {
-        ArgumentNullException.ThrowIfNull(problemDetailsService);
-        ArgumentNullException.ThrowIfNull(logger);
-
         _problemDetailsService = problemDetailsService;
         _logger = logger;
     }
@@ -84,6 +82,15 @@ internal sealed class GlobalExceptionHandler : IExceptionHandler
 
     private void LogOutcome(Exception exception, int? status)
     {
+        if (exception is ValidationException validationException)
+        {
+            _logger.LogWarning(
+                "Payment rejected on {RejectedFields}",
+                DescribeRejectedFields(validationException));
+
+            return;
+        }
+
         if (status >= StatusCodes.Status500InternalServerError && exception is not AcquiringBankUnavailableException
             && exception is not AcquiringBankTimeoutException)
         {
@@ -94,4 +101,11 @@ internal sealed class GlobalExceptionHandler : IExceptionHandler
 
         _logger.LogWarning("Request failed with status {StatusCode}", status);
     }
+
+    private static string DescribeRejectedFields(ValidationException exception) =>
+        string.Join(
+            _RejectedFieldSeparator,
+            exception.Errors
+                .Select(failure => ToContractFieldName(failure.PropertyName))
+                .Distinct());
 }

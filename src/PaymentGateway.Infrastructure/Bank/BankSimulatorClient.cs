@@ -10,17 +10,12 @@ public sealed class BankSimulatorClient : IAcquiringBankClient
 
     public BankSimulatorClient(HttpClient httpClient, ILogger<BankSimulatorClient> logger)
     {
-        ArgumentNullException.ThrowIfNull(httpClient);
-        ArgumentNullException.ThrowIfNull(logger);
-
         _httpClient = httpClient;
         _logger = logger;
     }
 
     public async Task<AuthorizationResult> Authorize(AuthorizationRequest request, CancellationToken cancellationToken)
     {
-        ArgumentNullException.ThrowIfNull(request);
-
         using var response = await SendPayment(request, cancellationToken);
 
         if (!response.IsSuccessStatusCode)

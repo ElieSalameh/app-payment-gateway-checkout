@@ -25,7 +25,6 @@ public sealed record CardDetails
 
     public static CardDetails FromCardNumber(string cardNumber, int expiryMonth, int expiryYear)
     {
-        ArgumentNullException.ThrowIfNull(cardNumber);
         GuardCardNumber(cardNumber);
         GuardExpiry(expiryMonth, expiryYear);
 

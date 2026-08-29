@@ -368,14 +368,6 @@ public sealed class ProcessPaymentValidatorTests
         messages.Should().NotContain(_ValidCvv);
     }
 
-    [Fact]
-    public void Constructor_WhenTimeProviderIsNull_ThrowsArgumentNullException()
-    {
-        var construct = () => new ProcessPaymentValidator(null!);
-
-        construct.Should().Throw<ArgumentNullException>();
-    }
-
     private static ProcessPaymentValidator ValidatorAt(DateTimeOffset asOf) =>
         new(new FakeTimeProvider(asOf));
 

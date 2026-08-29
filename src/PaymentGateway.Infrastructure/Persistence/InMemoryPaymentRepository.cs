@@ -6,7 +6,6 @@ public sealed class InMemoryPaymentRepository : IPaymentRepository
 
     public Task Add(Payment payment, CancellationToken cancellationToken)
     {
-        ArgumentNullException.ThrowIfNull(payment);
         cancellationToken.ThrowIfCancellationRequested();
 
         if (!_payments.TryAdd(payment.Id, payment))

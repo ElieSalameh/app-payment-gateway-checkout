@@ -14,8 +14,6 @@ public sealed record Money
 
     public static Money FromMinorUnits(long amountInMinorUnits, Currency currency)
     {
-        ArgumentNullException.ThrowIfNull(currency);
-
         if (amountInMinorUnits <= 0)
         {
             throw new ArgumentOutOfRangeException(

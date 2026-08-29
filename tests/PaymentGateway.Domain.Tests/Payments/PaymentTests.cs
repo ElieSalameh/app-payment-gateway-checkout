@@ -28,22 +28,6 @@ public sealed class PaymentTests
     }
 
     [Fact]
-    public void Create_WhenCardDetailsAreMissing_Throws()
-    {
-        var create = () => Payment.Authorized(PaymentId.New(), null!, Money.FromMinorUnits(100, Currency.Gbp));
-
-        create.Should().Throw<ArgumentNullException>();
-    }
-
-    [Fact]
-    public void Create_WhenAmountIsMissing_Throws()
-    {
-        var create = () => Payment.Authorized(PaymentId.New(), ValidCard(), null!);
-
-        create.Should().Throw<ArgumentNullException>();
-    }
-
-    [Fact]
     public void Payment_WhenCreated_NeverExposesTheFullCardNumber()
     {
         var payment = Payment.Authorized(PaymentId.New(), ValidCard(), Money.FromMinorUnits(100, Currency.Gbp));

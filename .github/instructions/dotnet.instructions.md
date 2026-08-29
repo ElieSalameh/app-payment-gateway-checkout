@@ -9,6 +9,7 @@ applyTo: "**/*.cs,**/*.csproj,**/*.props,**/*.targets"
 
 - Target `net8.0` in every project. The solution file is `PaymentGatewayCheckout.slnx`, which needs SDK **9.0.200 or newer** on the CLI; CI installs both 8 and 9.
 - `<Nullable>enable</Nullable>` and `<ImplicitUsings>enable</ImplicitUsings>` everywhere.
+- **Do not write `ArgumentNullException.ThrowIfNull`.** Declare non-nullability instead — non-nullable parameters, `required` properties, warnings as errors — and let the DI container and model binding enforce it, which they already do: an unbindable or null request body is a `400` before the action runs. Handle a genuine runtime null at the point of use (`?? throw ...`), not as a guard clause. Range, length, and format guards in the domain are unaffected.
 - `<TreatWarningsAsErrors>true</TreatWarningsAsErrors>`. Fix nullability warnings; never suppress with `!` or by disabling the analyzer.
 - Put shared properties in a root `Directory.Build.props` once there is more than one project, rather than repeating them.
 
