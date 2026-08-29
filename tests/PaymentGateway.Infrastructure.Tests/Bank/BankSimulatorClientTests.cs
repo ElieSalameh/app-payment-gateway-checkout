@@ -141,6 +141,16 @@ public sealed class BankSimulatorClientTests
     }
 
     [Fact]
+    public async Task Authorize_WhenTheCircuitIsOpen_ThrowsAcquiringBankUnavailableException()
+    {
+        var handler = Throwing(new BrokenCircuitException());
+
+        var authorize = async () => await ClientFor(handler).Authorize(ValidRequest(), CancellationToken.None);
+
+        await authorize.Should().ThrowAsync<AcquiringBankUnavailableException>();
+    }
+
+    [Fact]
     public async Task Authorize_WhenADependencyFailureIsSurfaced_NeverEchoesTheCardNumberOrCvv()
     {
         var handler = RespondingWith(HttpStatusCode.ServiceUnavailable, string.Empty);

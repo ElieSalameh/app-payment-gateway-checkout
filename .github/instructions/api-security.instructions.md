@@ -13,7 +13,7 @@ The brief lists two functional requirements and explicitly discourages over-engi
 
 **Document, do not build.** A `## Production considerations` section in `README.md` covering: API key or mTLS merchant authentication with `CryptographicOperations.FixedTimeEquals` comparison rather than `==`; per-merchant payment scoping so one merchant cannot read another's payments; rate limiting via the built-in .NET 8 limiter returning `429` with `Retry-After`; idempotency keys on the process endpoint; secret storage and rotation with separate credentials per environment; and provider-hosted fields or tokenization so raw PAN never reaches the API.
 
-Keep the boundary structured so authorization can be added later — threading a merchant identifier through the command and storing it on the payment costs nothing and makes the follow-up small. Do not add the authentication scheme itself. Half an identity system reads worse in review than a clearly documented absent one.
+The gateway carries no merchant concept at all — not on the command, not on the `Payment`, not in the repository lookup. The brief names the merchant as an actor and never as a field, and an unauthenticated identifier enforces nothing while resembling an access control, which reads worse in review than a clearly documented absence. Do not add the authentication scheme, and do not thread a `MerchantId` in preparation for one. Document the consequences instead: both endpoints are open to any caller, `POST /payments` is a card-testing oracle, retrieval performs no ownership check, and adding authorization later would touch the command, the entity, the port, both handlers, and the query.
 
 ## Sensitive payment data
 
