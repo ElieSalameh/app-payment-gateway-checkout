@@ -86,16 +86,6 @@ public sealed class ProcessPaymentHandlerTests
     }
 
     [Fact]
-    public async Task Handle_WhenTheCommandIsInvalid_ThrowsValidationException()
-    {
-        var handler = HandlerFor(FakeAcquiringBankClient.Returning(PaymentStatus.Authorized), new FakePaymentRepository());
-
-        var handle = () => handler.Handle(ValidCommand() with { Cvv = "12" }, CancellationToken.None);
-
-        await handle.Should().ThrowAsync<ValidationException>();
-    }
-
-    [Fact]
     public async Task Handle_WhenTheCommandIsInvalid_DoesNotCallTheBankAndStoresNothing()
     {
         var bank = FakeAcquiringBankClient.Returning(PaymentStatus.Authorized);

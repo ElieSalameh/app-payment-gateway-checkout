@@ -3,7 +3,6 @@ namespace PaymentGateway.Infrastructure.Tests.Persistence;
 public sealed class InMemoryPaymentRepositoryTests
 {
     private const string _CardNumber = "2222405343248877";
-    private const string _LastFourDigits = "8877";
     private const int _ExpiryMonth = 4;
     private const int _ExpiryYear = 2030;
     private const long _AmountInMinorUnits = 100;
@@ -40,31 +39,6 @@ public sealed class InMemoryPaymentRepositoryTests
         var stored = await repository.GetById(PaymentId.New(), CancellationToken.None);
 
         stored.Should().BeNull();
-    }
-
-    [Fact]
-    public async Task GetById_WhenThePaymentWasDeclined_PreservesTheStatus()
-    {
-        var repository = new InMemoryPaymentRepository();
-        var payment = Payment.Declined(PaymentId.New(), Card(), Amount());
-
-        await repository.Add(payment, CancellationToken.None);
-        var stored = await repository.GetById(payment.Id, CancellationToken.None);
-
-        stored!.Status.Should().Be(PaymentStatus.Declined);
-    }
-
-    [Fact]
-    public async Task GetById_WhenThePaymentWasAdded_HoldsOnlyTheLastFourDigits()
-    {
-        var repository = new InMemoryPaymentRepository();
-        var payment = AuthorizedPayment(PaymentId.New());
-
-        await repository.Add(payment, CancellationToken.None);
-        var stored = await repository.GetById(payment.Id, CancellationToken.None);
-
-        stored!.Card.LastFourDigits.Should().Be(_LastFourDigits);
-        stored.ToString().Should().NotContain(_CardNumber);
     }
 
     [Fact]

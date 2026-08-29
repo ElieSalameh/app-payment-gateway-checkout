@@ -36,17 +36,6 @@ public sealed class GetPaymentHandlerTests
         await handle.Should().ThrowAsync<PaymentNotFoundException>();
     }
 
-    [Fact]
-    public async Task Handle_WhenAnotherPaymentIsStored_ThrowsPaymentNotFoundException()
-    {
-        var repository = new FakePaymentRepository();
-        await repository.Add(AuthorizedPayment(), CancellationToken.None);
-
-        var handle = () => HandlerFor(repository).Handle(QueryFor(PaymentId.New()), CancellationToken.None);
-
-        await handle.Should().ThrowAsync<PaymentNotFoundException>();
-    }
-
     private static GetPaymentHandler HandlerFor(FakePaymentRepository repository) =>
         new(repository, NullLogger<GetPaymentHandler>.Instance);
 

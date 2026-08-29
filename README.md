@@ -6,7 +6,7 @@ A .NET 8 Web API that sits between a merchant and an acquiring bank. A merchant 
 
 The gateway validates the request, calls a simulated acquiring bank, stores the outcome in an in-memory repository, and returns payment details with the card number masked. The full card number and the CVV are never stored, never logged, and never returned.
 
-**Status: complete.** Both endpoints are implemented and covered by 193 automated tests. The sections below describe what the code does, not what it is intended to do.
+**Status: complete.** Both endpoints are implemented and covered by 188 automated tests. The sections below describe what the code does, not what it is intended to do.
 
 ## Contents
 
@@ -115,13 +115,13 @@ Invoke-RestMethod -Uri https://localhost:55740/payments/b9877a5a-e8a7-4a39-b804-
 dotnet test .\PaymentGatewayCheckout.slnx
 ```
 
-193 tests, no external dependencies — the suite never calls the real simulator.
+188 tests, no external dependencies — the suite never calls the real simulator.
 
 | Project | Tests | Covers |
 | --- | --- | --- |
-| `PaymentGateway.Domain.Tests` | 65 | Value object invariants: `Money` rejecting zero and negatives, `Currency` limited to the supported three, `CardDetails` exposing only the last four digits, expiry arithmetic at month boundaries |
-| `PaymentGateway.Application.Tests` | 78 | Every validation rule at its boundaries (13/14/19/20-character card numbers, month 0/1/12/13, expiry last month / this month / next month, 2/3/4/5-character CVV), and both handlers with the ports faked |
-| `PaymentGateway.Infrastructure.Tests` | 27 | The bank client against a stubbed `HttpMessageHandler`: snake_case body, `MM/yyyy` expiry, authorized and declined mapping, `503`, unreadable body, timeout, open circuit; and the in-memory repository including concurrent writes |
+| `PaymentGateway.Domain.Tests` | 64 | Value object invariants: `Money` rejecting zero and negatives, `Currency` limited to the supported three, `CardDetails` exposing only the last four digits, expiry arithmetic at month boundaries |
+| `PaymentGateway.Application.Tests` | 76 | Every validation rule at its boundaries (13/14/19/20-character card numbers, month 0/1/12/13, expiry last month / this month / next month, 2/3/4/5-character CVV), and both handlers with the ports faked |
+| `PaymentGateway.Infrastructure.Tests` | 25 | The bank client against a stubbed `HttpMessageHandler`: snake_case body, `MM/yyyy` expiry, authorized and declined mapping, `503`, unreadable body, timeout, open circuit; and the in-memory repository including concurrent writes |
 | `PaymentGateway.Api.IntegrationTests` | 23 | The full pipeline through `WebApplicationFactory` with the bank stubbed: status codes, `ProblemDetails` shapes, retrieval, and log redaction |
 
 The build workflow runs the same command on Linux for every pull request, so the badge reflects the suite independently of any one machine.
