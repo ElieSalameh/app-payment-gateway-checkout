@@ -19,18 +19,10 @@ public sealed record Payment
     public Money Amount { get; }
 
     public static Payment Authorized(PaymentId id, CardDetails card, Money amount) =>
-        Create(id, PaymentStatus.Authorized, card, amount);
+        new(id, PaymentStatus.Authorized, card, amount);
 
     public static Payment Declined(PaymentId id, CardDetails card, Money amount) =>
-        Create(id, PaymentStatus.Declined, card, amount);
+        new(id, PaymentStatus.Declined, card, amount);
 
     public override string ToString() => $"Payment {Id} {Status} {Amount}";
-
-    private static Payment Create(PaymentId id, PaymentStatus status, CardDetails card, Money amount)
-    {
-        ArgumentNullException.ThrowIfNull(card);
-        ArgumentNullException.ThrowIfNull(amount);
-
-        return new Payment(id, status, card, amount);
-    }
 }

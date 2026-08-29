@@ -132,16 +132,6 @@ public sealed class ProcessPaymentHandlerTests
         repository.StoredPayments.Should().BeEmpty();
     }
 
-    [Fact]
-    public async Task Handle_WhenTheCommandIsNull_ThrowsArgumentNullException()
-    {
-        var handler = HandlerFor(FakeAcquiringBankClient.Returning(PaymentStatus.Authorized), new FakePaymentRepository());
-
-        var handle = () => handler.Handle(null!, CancellationToken.None);
-
-        await handle.Should().ThrowAsync<ArgumentNullException>();
-    }
-
     private static ProcessPaymentHandler HandlerFor(FakeAcquiringBankClient bank, FakePaymentRepository repository) =>
         new(
             new ProcessPaymentValidator(new FakeTimeProvider(_Now)),

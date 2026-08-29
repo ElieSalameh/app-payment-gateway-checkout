@@ -17,9 +17,6 @@ public sealed class PaymentsController : ControllerBase
 
     public PaymentsController(ProcessPaymentHandler processPaymentHandler, GetPaymentHandler getPaymentHandler)
     {
-        ArgumentNullException.ThrowIfNull(processPaymentHandler);
-        ArgumentNullException.ThrowIfNull(getPaymentHandler);
-
         _processPaymentHandler = processPaymentHandler;
         _getPaymentHandler = getPaymentHandler;
     }
@@ -34,8 +31,6 @@ public sealed class PaymentsController : ControllerBase
         ProcessPaymentRequest request,
         CancellationToken cancellationToken)
     {
-        ArgumentNullException.ThrowIfNull(request);
-
         var result = await _processPaymentHandler.Handle(ToCommand(request), cancellationToken);
         var response = ToResponse(result);
 

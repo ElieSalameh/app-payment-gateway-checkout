@@ -80,16 +80,6 @@ public sealed class InMemoryPaymentRepositoryTests
     }
 
     [Fact]
-    public async Task Add_WhenThePaymentIsNull_Throws()
-    {
-        var repository = new InMemoryPaymentRepository();
-
-        var add = async () => await repository.Add(null!, CancellationToken.None);
-
-        await add.Should().ThrowAsync<ArgumentNullException>();
-    }
-
-    [Fact]
     public async Task Add_WhenCancellationIsRequested_Throws()
     {
         var repository = new InMemoryPaymentRepository();

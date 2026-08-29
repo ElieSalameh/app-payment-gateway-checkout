@@ -16,19 +16,14 @@ public sealed record ProcessPaymentResult
 
     public required long Amount { get; init; }
 
-    public static ProcessPaymentResult From(Payment payment)
+    public static ProcessPaymentResult From(Payment payment) => new()
     {
-        ArgumentNullException.ThrowIfNull(payment);
-
-        return new ProcessPaymentResult
-        {
-            Id = payment.Id,
-            Status = payment.Status,
-            LastFourCardDigits = payment.Card.LastFourDigits,
-            ExpiryMonth = payment.Card.ExpiryMonth,
-            ExpiryYear = payment.Card.ExpiryYear,
-            Currency = payment.Amount.Currency.Code,
-            Amount = payment.Amount.AmountInMinorUnits
-        };
-    }
+        Id = payment.Id,
+        Status = payment.Status,
+        LastFourCardDigits = payment.Card.LastFourDigits,
+        ExpiryMonth = payment.Card.ExpiryMonth,
+        ExpiryYear = payment.Card.ExpiryYear,
+        Currency = payment.Amount.Currency.Code,
+        Amount = payment.Amount.AmountInMinorUnits
+    };
 }

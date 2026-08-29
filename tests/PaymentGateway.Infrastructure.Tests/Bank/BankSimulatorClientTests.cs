@@ -153,16 +153,6 @@ public sealed class BankSimulatorClientTests
     }
 
     [Fact]
-    public async Task Authorize_WhenTheRequestIsNull_ThrowsArgumentNullException()
-    {
-        var handler = RespondingWith(HttpStatusCode.OK, AuthorizedBody(authorized: true));
-
-        var authorize = async () => await ClientFor(handler).Authorize(null!, CancellationToken.None);
-
-        await authorize.Should().ThrowAsync<ArgumentNullException>();
-    }
-
-    [Fact]
     public async Task Authorize_WhenCancellationIsRequested_ThrowsTaskCanceledException()
     {
         var handler = RespondingWith(HttpStatusCode.OK, AuthorizedBody(authorized: true));

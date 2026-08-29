@@ -20,8 +20,6 @@ public sealed class ProcessPaymentValidator : AbstractValidator<ProcessPaymentCo
 
     public ProcessPaymentValidator(TimeProvider timeProvider)
     {
-        ArgumentNullException.ThrowIfNull(timeProvider);
-
         _timeProvider = timeProvider;
 
         RuleLevelCascadeMode = CascadeMode.Stop;

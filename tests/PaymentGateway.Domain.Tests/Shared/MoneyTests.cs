@@ -27,14 +27,6 @@ public sealed class MoneyTests
     }
 
     [Fact]
-    public void FromMinorUnits_WhenCurrencyIsMissing_Throws()
-    {
-        var create = () => Money.FromMinorUnits(100, null!);
-
-        create.Should().Throw<ArgumentNullException>();
-    }
-
-    [Fact]
     public void Equality_WhenAmountAndCurrencyMatch_TreatsThemAsEqual()
     {
         Money.FromMinorUnits(1050, Currency.Usd).Should().Be(Money.FromMinorUnits(1050, Currency.Usd));

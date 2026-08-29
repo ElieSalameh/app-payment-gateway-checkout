@@ -2,7 +2,7 @@ namespace PaymentGateway.Application.Payments.ProcessPayment;
 
 public sealed partial class ProcessPaymentHandler
 {
-    private const string _PaymentIdScopeName = "PaymentId";
+    private const string _PaymentIdScopeTemplate = "PaymentId:{PaymentId}";
 
     private readonly IValidator<ProcessPaymentCommand> _validator;
     private readonly IAcquiringBankClient _acquiringBankClient;
@@ -15,11 +15,6 @@ public sealed partial class ProcessPaymentHandler
         IPaymentRepository paymentRepository,
         ILogger<ProcessPaymentHandler> logger)
     {
-        ArgumentNullException.ThrowIfNull(validator);
-        ArgumentNullException.ThrowIfNull(acquiringBankClient);
-        ArgumentNullException.ThrowIfNull(paymentRepository);
-        ArgumentNullException.ThrowIfNull(logger);
-
         _validator = validator;
         _acquiringBankClient = acquiringBankClient;
         _paymentRepository = paymentRepository;
@@ -28,16 +23,11 @@ public sealed partial class ProcessPaymentHandler
 
     public async Task<ProcessPaymentResult> Handle(ProcessPaymentCommand command, CancellationToken cancellationToken)
     {
-        ArgumentNullException.ThrowIfNull(command);
-
         await _validator.ValidateAndThrowAsync(command, cancellationToken);
 
         var paymentId = PaymentId.New();
 
-        using var paymentScope = _logger.BeginScope(new Dictionary<string, object>
-        {
-            [_PaymentIdScopeName] = paymentId
-        });
+        using var paymentScope = _logger.BeginScope(_PaymentIdScopeTemplate, paymentId);
 
         var authorization = await _acquiringBankClient.Authorize(ToAuthorizationRequest(command), cancellationToken);
         var payment = ToPayment(paymentId, command, authorization.Status);

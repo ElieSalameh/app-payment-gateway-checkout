@@ -116,6 +116,23 @@ public sealed class PaymentsEndpointTests : IClassFixture<WebApplicationFactory<
     }
 
     [Fact]
+    public async Task GetPayment_WhenSeveralPaymentsWereProcessed_ReturnsTheOneAskedFor()
+    {
+        var client = ClientFor(StubAcquiringBankClient.Returning(DomainPaymentStatus.Authorized));
+        var first = await ReadPaymentAsync(await client.PostAsJsonAsync(_PaymentsRoute, ValidRequest()));
+        var second = await ReadPaymentAsync(await client.PostAsJsonAsync(
+            _PaymentsRoute,
+            ValidRequest() with { Amount = 4200, Currency = "EUR" }));
+
+        var retrieved = await ReadPaymentAsync(await client.GetAsync($"{_PaymentsRoute}/{second.Id}"));
+
+        second.Id.Should().NotBe(first.Id);
+        retrieved.Id.Should().Be(second.Id);
+        retrieved.Amount.Should().Be(4200);
+        retrieved.Currency.Should().Be("EUR");
+    }
+
+    [Fact]
     public async Task GetPayment_WhenThePaymentIsUnknown_ReturnsNotFound()
     {
         var client = ClientFor(StubAcquiringBankClient.Returning(DomainPaymentStatus.Authorized));

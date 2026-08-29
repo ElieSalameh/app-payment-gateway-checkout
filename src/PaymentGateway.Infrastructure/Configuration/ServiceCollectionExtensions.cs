@@ -14,8 +14,6 @@ public static class ServiceCollectionExtensions
         this IServiceCollection services,
         IConfiguration configuration)
     {
-        ArgumentNullException.ThrowIfNull(configuration);
-
         services.AddSingleton<IPaymentRepository, InMemoryPaymentRepository>();
 
         services

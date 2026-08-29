@@ -7,17 +7,12 @@ public sealed partial class GetPaymentHandler
 
     public GetPaymentHandler(IPaymentRepository paymentRepository, ILogger<GetPaymentHandler> logger)
     {
-        ArgumentNullException.ThrowIfNull(paymentRepository);
-        ArgumentNullException.ThrowIfNull(logger);
-
         _paymentRepository = paymentRepository;
         _logger = logger;
     }
 
     public async Task<GetPaymentResult> Handle(GetPaymentQuery query, CancellationToken cancellationToken)
     {
-        ArgumentNullException.ThrowIfNull(query);
-
         var payment = await _paymentRepository.GetById(query.PaymentId, cancellationToken);
 
         if (payment is null)
