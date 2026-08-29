@@ -2,56 +2,129 @@
 
 [![Build](https://github.com/ElieSalameh/app-payment-gateway-checkout/actions/workflows/build.yml/badge.svg)](https://github.com/ElieSalameh/app-payment-gateway-checkout/actions/workflows/build.yml)
 
-## Overview
+A .NET 8 Web API that sits between a merchant and an acquiring bank. A merchant submits a card payment for authorization and later retrieves that payment by its identifier.
 
-This project is a .NET 8 Web API for a payment gateway assessment. It will allow a merchant to submit a card payment for authorization and retrieve the details of a previously created payment.
+The gateway validates the request, calls a simulated acquiring bank, stores the outcome in an in-memory repository, and returns payment details with the card number masked. The full card number and the CVV are never stored, never logged, and never returned.
 
-The gateway validates payment requests, calls a simulated acquiring bank, stores the payment result in an in-memory or test-double repository, and returns safe payment details.
+**Status: complete.** Both endpoints are implemented and covered by 193 automated tests. The sections below describe what the code does, not what it is intended to do.
 
-> The repository is currently being implemented incrementally. The API and roadmap below describe the target behavior from the project requirements.
+## Contents
 
-## Goals
+- [Quick start](#quick-start)
+- [Trying it by hand](#trying-it-by-hand)
+- [Running the tests](#running-the-tests)
+- [API contract](#api-contract)
+- [Bank simulator](#bank-simulator)
+- [Architecture](#architecture)
+- [Design decisions and assumptions](#design-decisions-and-assumptions)
+- [Security and data handling](#security-and-data-handling)
+- [What I would add next](#what-i-would-add-next)
+- [Scope boundaries](#scope-boundaries)
 
-- Process a card payment through the bank simulator.
-- Return one of `Authorized`, `Declined`, or `Rejected`.
-- Retrieve a payment by its identifier.
-- Keep full card numbers and CVV values out of responses, logs, and stored payment records.
-- Keep the implementation simple, readable, maintainable, and covered by automated tests.
+## Quick start
 
-## Payment requirements
+### Prerequisites
 
-### Processing a payment
+- **.NET 8 SDK** — every project targets `net8.0`.
+- **.NET SDK 9.0.200 or newer**, additionally, because the solution file is `PaymentGatewayCheckout.slnx`. The `.slnx` format is only understood from that SDK version onwards, so an older CLI fails at `dotnet restore` before anything compiles. Installing both side by side is supported and is what CI does. To build without it, pass the project files directly instead of the solution.
+- **Docker**, to run the bank simulator.
 
-A payment request must contain the following fields:
+### 1. Start the bank simulator
 
-| Field | Validation |
-| --- | --- |
-| Card number | Required, numeric, and 14–19 characters |
-| Expiry month | Required and between 1 and 12 |
-| Expiry year | Required; the month/year combination must be in the future |
-| Currency | Required, three characters, and one of no more than three supported ISO currency codes |
-| Amount | Required integer in minor currency units, such as `1050` for USD 10.50 |
-| CVV | Required, numeric, and 3–4 characters |
+From the repository root:
 
-Invalid input must be rejected without calling the bank simulator.
+```powershell
+docker-compose -f docker/docker-compose.yml up
+```
 
-Valid requests should return:
+It listens on `http://localhost:8080`, which is the address `BankSimulator:BaseAddress` points at. Confirm it answers before starting the gateway — if it is down, every payment correctly returns `502`:
 
-- A payment ID.
-- A status of `Authorized` or `Declined`.
-- The last four card digits only.
-- Expiry month and year.
-- Currency.
-- Amount in minor currency units.
+```powershell
+Invoke-RestMethod -Uri http://localhost:8080/payments -Method Post -ContentType application/json -Body '{"card_number":"2222405343248877","expiry_date":"04/2030","currency":"GBP","amount":100,"cvv":"123"}'
+```
 
-### Retrieving a payment
+<details>
+<summary>No Docker available?</summary>
 
-The API contract is:
+The simulator is [mountebank](https://www.mbtest.org/), a Node tool, so it can run directly from the same imposter configuration:
 
-- `POST /payments` — validate and process a payment.
-- `GET /payments/{id}` — retrieve a payment by ID.
+```powershell
+npx -y mountebank@2.8.1 --configfile docker/imposters/bank_simulator.ejs --allowInjection
+```
 
-The retrieval response includes the payment ID, status, masked card details, expiry month and year, currency, and amount.
+This writes an `mb.pid` file, which is git-ignored. Stop it with `npx -y mountebank@2.8.1 stop`.
+
+</details>
+
+### 2. Run the gateway
+
+```powershell
+dotnet restore .\PaymentGatewayCheckout.slnx
+dotnet run --project .\src\PaymentGateway.Api\PaymentGateway.Api.csproj
+```
+
+It listens on `https://localhost:55740` and `http://localhost:55741`. HTTPS redirection is always on, so use the HTTPS address — a plain HTTP `POST` receives a `307` that most clients will not follow with the body attached. Run `dotnet dev-certs https --trust` once if the certificate is not yet trusted.
+
+### 3. Confirm it is up
+
+Open `https://localhost:55740/swagger`. Swagger UI is served in the Development environment only, which the launch profile sets, and the launch profile opens it for you. There is no health endpoint — the brief does not ask for one, and adding unrequested endpoints is the over-engineering it warns against.
+
+## Trying it by hand
+
+`src/PaymentGateway.Api/PaymentGateway.Api.http` contains every request below and runs directly in Visual Studio, or in VS Code with the REST Client extension. The equivalents in PowerShell:
+
+**An authorized payment** — the simulator authorizes card numbers ending in an odd digit:
+
+```powershell
+Invoke-RestMethod -Uri https://localhost:55740/payments -Method Post -ContentType application/json -Body '{"cardNumber":"2222405343248877","expiryMonth":4,"expiryYear":2030,"currency":"GBP","amount":100,"cvv":"123"}'
+```
+
+`201 Created`, a `Location` header pointing at the new payment, and:
+
+```json
+{
+  "id": "b9877a5a-e8a7-4a39-b804-90f740a4c7dc",
+  "status": "Authorized",
+  "lastFourCardDigits": "8877",
+  "expiryMonth": 4,
+  "expiryYear": 2030,
+  "currency": "GBP",
+  "amount": 100
+}
+```
+
+**A declined payment** — card numbers ending in an even digit, for example `2222405343248112`. Also `201`, with `"status": "Declined"`. The bank answered and the payment was stored, so the resource exists either way.
+
+**A rejected request** — anything that fails validation, for example `"cvv": "1"`. Returns `400` with the field-level errors, `"paymentStatus": "Rejected"`, and no payment id. Check the simulator's console: it received nothing.
+
+**An unavailable bank** — card numbers ending in `0`, for example `2222405343248870`, make the simulator return `503`. The gateway returns `502`, not a decline, and stores nothing.
+
+**Retrieving a payment** — using the `id` from the first call:
+
+```powershell
+Invoke-RestMethod -Uri https://localhost:55740/payments/b9877a5a-e8a7-4a39-b804-90f740a4c7dc
+```
+
+`200 OK` with the same body. An unknown id returns `404`; an id that is not a GUID is rejected by routing before any code runs.
+
+**Check the log while you do this.** Every line carries `TraceId`, and payment lines carry `PaymentId`, so the `traceId` in any error body can be found in the log. Search the output for `2222405343248877` and `123` — neither the card number nor the CVV appears anywhere, on any path.
+
+## Running the tests
+
+```powershell
+dotnet test .\PaymentGatewayCheckout.slnx
+```
+
+193 tests, no external dependencies — the suite never calls the real simulator.
+
+| Project | Tests | Covers |
+| --- | --- | --- |
+| `PaymentGateway.Domain.Tests` | 65 | Value object invariants: `Money` rejecting zero and negatives, `Currency` limited to the supported three, `CardDetails` exposing only the last four digits, expiry arithmetic at month boundaries |
+| `PaymentGateway.Application.Tests` | 78 | Every validation rule at its boundaries (13/14/19/20-character card numbers, month 0/1/12/13, expiry last month / this month / next month, 2/3/4/5-character CVV), and both handlers with the ports faked |
+| `PaymentGateway.Infrastructure.Tests` | 27 | The bank client against a stubbed `HttpMessageHandler`: snake_case body, `MM/yyyy` expiry, authorized and declined mapping, `503`, unreadable body, timeout, open circuit; and the in-memory repository including concurrent writes |
+| `PaymentGateway.Api.IntegrationTests` | 23 | The full pipeline through `WebApplicationFactory` with the bank stubbed: status codes, `ProblemDetails` shapes, retrieval, and log redaction |
+
+The build workflow runs the same command on Linux for every pull request, so the badge reflects the suite independently of any one machine.
 
 ## API contract
 
@@ -66,8 +139,8 @@ The retrieval response includes the payment ID, status, masked card details, exp
 | `201 Created` | The payment reached the acquiring bank and was `Authorized` or `Declined` | `PaymentResponse` |
 | `200 OK` | An existing payment was retrieved | `PaymentResponse` |
 | `400 Bad Request` | The request failed gateway validation and was **rejected** | `ValidationProblemDetails` |
-| `404 Not Found` | No payment exists for the given ID | `ProblemDetails` |
-| `502 Bad Gateway` | The bank simulator was unavailable | `ProblemDetails` |
+| `404 Not Found` | No payment exists for the given id | `ProblemDetails` |
+| `502 Bad Gateway` | The bank simulator was unavailable, unreachable, or answered unreadably | `ProblemDetails` |
 | `504 Gateway Timeout` | The bank simulator did not respond in time | `ProblemDetails` |
 | `500 Internal Server Error` | Anything unexpected | `ProblemDetails` |
 
@@ -107,31 +180,36 @@ A rejected request returns `400` with an RFC 7807 body. The `paymentStatus` memb
 }
 ```
 
-A rejected request produces **no** stored payment, **no** payment id, and **no** call to the bank simulator.
+A rejected request produces **no** stored payment, **no** payment id, and **no** call to the bank simulator. Error keys are camelCase, matching the rest of the public API, and error messages never echo the submitted value — a card number or CVV must not escape through an error body.
 
-### Current status
+### Validation rules
 
-This commit publishes the contract and its OpenAPI document only. Both endpoints return `501 Not Implemented` until the domain, application, and infrastructure layers land in the following steps. The routes, request and response shapes, and documented status codes above are final.
+| Field | Rules |
+| --- | --- |
+| `cardNumber` | Required, 14–19 characters, digits only |
+| `expiryMonth` | Required, 1–12 |
+| `expiryYear` | Required, four digits, and the month/year combination must not have passed |
+| `currency` | Required, exactly 3 characters, one of `GBP`/`USD`/`EUR` |
+| `amount` | Required integer in minor units, greater than zero |
+| `cvv` | Required, 3–4 characters, digits only |
+
+A card is expired once the calendar has moved past its expiry month, so a card expiring this month is valid until the month ends — which is what the card networks mean by an expiry date.
 
 ## Bank simulator
 
-The acquiring bank simulator accepts a `POST` request at:
-
-`http://localhost:8080/payments`
-
-It expects a request similar to:
+The simulator accepts `POST http://localhost:8080/payments` with a snake_case body and a single `MM/yyyy` expiry string:
 
 ```json
 {
   "card_number": "2222405343248877",
-  "expiry_date": "04/2025",
+  "expiry_date": "04/2030",
   "currency": "GBP",
   "amount": 100,
   "cvv": "123"
 }
 ```
 
-The normal response is similar to:
+and answers:
 
 ```json
 {
@@ -140,14 +218,9 @@ The normal response is similar to:
 }
 ```
 
-Simulator behavior:
+Its behaviour is driven by the last digit of the card number: odd authorizes, even declines, `0` returns `503 Service Unavailable`, and a missing field returns `400`.
 
-- Missing fields return `400 Bad Request`.
-- Card numbers ending in `1`, `3`, `5`, `7`, or `9` return an authorized response. The gateway maps this to `Authorized`.
-- Card numbers ending in `2`, `4`, `6`, or `8` return an unauthorized response. The gateway maps this to `Declined`.
-- Card numbers ending in `0` return `503 Service Unavailable`. The gateway must report a dependency failure and must not falsely report an authorization or decline.
-
-The simulator URL must be configurable. Do not call a live acquiring bank.
+The gateway's own API is camelCase with separate expiry month and year fields. The translation between the two shapes belongs to the infrastructure layer and does not leak inwards.
 
 ### Bank client decisions
 
@@ -166,89 +239,60 @@ The `BankSimulator` configuration section binds to `BankSimulatorOptions` and is
 
 **Any unsuccessful response is an unknown outcome.** Only a `200` carrying the documented body produces `Authorized` or `Declined`. A `503`, any other error status, an unreachable host, or a `200` whose body cannot be read all raise a dependency failure and store nothing. The gateway never infers `Declined` from a transport failure, because telling a merchant a payment failed when it may have succeeded is the most damaging error it could make.
 
+**An open circuit is a dependency failure too.** When repeated failures trip the breaker, Polly raises `BrokenCircuitException` instead of attempting the call. The client translates it to the same `AcquiringBankUnavailableException` as any other unreachable-bank case, so a sustained outage keeps returning `502` rather than degrading into `500`. This was found by driving the running API rather than by reading it, which is why the case now has its own test.
+
 **A timeout is distinguished from a cancellation.** The pipeline raises Polly's `TimeoutRejectedException`, which the client translates into `AcquiringBankTimeoutException` at the infrastructure boundary. That keeps Polly types out of the API layer and avoids treating `TaskCanceledException` — which is also what a merchant disconnecting produces — as a gateway timeout.
 
 The full card number and CVV exist only in the request DTO and the outbound call to the simulator. `AuthorizationRequest` and the bank's own request DTO both override `ToString()` to expose neither, so an accidental log of either object cannot leak them.
 
 ## Architecture
 
-The implementation should use the smallest architecture that keeps responsibilities and testing clear:
+Four projects. Dependencies point inward, and the split is enforced by the compiler rather than by convention:
 
 ```text
 src/
-  PaymentGateway.Api/             # HTTP endpoints, models, pipeline, and composition root
-  PaymentGateway.Application/     # payment use cases, validation, ports, and results
-  PaymentGateway.Domain/          # payment state, value objects, and business rules
-  PaymentGateway.Infrastructure/  # bank HTTP client and in-memory repository
+  PaymentGateway.Api/             # controllers, contracts, middleware, composition root
+  PaymentGateway.Application/     # use cases, validation, ports, results
+  PaymentGateway.Domain/          # payment state, value objects, invariants
+  PaymentGateway.Infrastructure/  # bank HTTP client, in-memory repository
 
 tests/
   PaymentGateway.Domain.Tests/
   PaymentGateway.Application.Tests/
+  PaymentGateway.Infrastructure.Tests/
   PaymentGateway.Api.IntegrationTests/
 ```
 
-The current single `PaymentGateway.Api` project is acceptable while the project is small. New projects should be introduced only when they create a useful dependency or testing boundary.
+- **`Domain`** has zero project references and no packages beyond the BCL. It is a separate assembly precisely so that "the business rules depend on nothing" is a compiler guarantee rather than a folder convention that quietly erodes.
+- **`Application`** references `Domain` only. It declares the two ports it needs — `IAcquiringBankClient` and `IPaymentRepository` — without knowing that one is HTTP and the other a dictionary.
+- **`Infrastructure`** references `Application` and `Domain` and implements those ports. Replacing the in-memory store with SQL touches one file.
+- **`Api`** references `Application`, and `Infrastructure` only at the composition root. Its job is HTTP: routing, serialization, status codes.
 
-Dependencies should point inward:
+Two organising principles are used deliberately. `Api` is arranged by transport role (`Controllers/`, `Contracts/`, `Middleware/`, `Configuration/`) because that is the conventional ASP.NET Core shape a reviewer can navigate without orientation. The inner layers are arranged by capability (`Payments/ProcessPayment/`, `Payments/GetPayment/`, `Bank/`, `Persistence/`) because there the code that changes together is the code for one use case.
 
-- The API calls application use cases.
-- The application depends on domain rules and interfaces.
-- Infrastructure implements the application interfaces.
-- The domain does not depend on ASP.NET Core, HTTP, persistence, or provider-specific code.
+The four-project split is the layout Microsoft's reference applications use, so it reads without explanation. The brief's warning about over-engineering is aimed at speculative *features* — CQRS buses, a mediator, an outbox, event sourcing, idempotency protocols — none of which are here.
 
-## Testing strategy
+## Design decisions and assumptions
 
-Use xUnit as the default test framework unless the repository adopts another standard.
+**Storage is in memory, behind a port.** `InMemoryPaymentRepository` is a `ConcurrentDictionary` registered as a singleton, as the brief allows. `Add` throws rather than overwriting an existing id: a duplicate means a bug upstream, and silently replacing a stored payment would lose the record of a real charge. Payments do not survive a restart, which is acceptable for an assessment and is the first thing production would change.
 
-- **Unit tests:** payment validation, domain rules, card masking, and application result mapping.
-- **Integration tests:** ASP.NET Core routing, serialization, dependency injection, the bank client boundary, and payment retrieval.
-- **End-to-end tests:** a small number of critical journeys using the local API and simulator, if needed.
+**`PaymentId` is a value type, not a `Guid`.** The repository port takes `PaymentId`, so the raw `Guid` from the route is converted once at the edge and travels typed from there. Preventing identifier mix-ups at the repository boundary is the entire reason the type exists, so that boundary is exactly where the primitive must not reappear.
 
-Important scenarios include:
+**A payment is `Authorized` or `Declined` — never `Rejected`.** The brief states that a rejected request creates no payment, so there is nothing to give a status to. `Rejected` exists only as the shape of the `400`, which is why both the domain and the wire enums hold exactly two values.
 
-- Each invalid payment field produces rejected behavior.
-- Rejected input does not call the simulator.
-- Authorized, declined, and simulator-failure responses are mapped correctly.
-- Payments can be stored and retrieved by ID.
-- Unknown payment IDs return the documented response.
-- Full card numbers and CVV values are not returned or logged.
+**Validation lives in `Application`, on the command, not on the HTTP request.** `Rejected` is a business outcome the brief names, so the rule producing it belongs with the use case where a second entry point cannot bypass it. The command carries every field as nullable, because "required" is one of the rules the validator must be able to fail — binding a missing field would otherwise crash before validation could report it.
 
-## Running locally
+**Validation failures travel as an exception.** `ProcessPaymentHandler` calls `ValidateAndThrowAsync`, and `GlobalExceptionHandler` turns the result into the `400` body. Returning a result union instead would need a second refusal vocabulary in the application layer and would rebuild the rejection body at the controller, while the wire `PaymentStatus` still could not carry `Rejected`. One refusal shape, built in one place, is worth the throw.
 
-### Prerequisites
+**Error mapping is ours, not the framework's.** `GlobalExceptionHandler` implements .NET 8's `IExceptionHandler`, so the whole exception-to-status mapping is readable in one file and a wrong mapping is a one-line fix. Framework defaults had already hidden two real defects here — internal .NET type names leaking into `400` bodies, and a `[Produces]` attribute silently overriding the `problem+json` content type — neither visible in the source, both found by calling the running API.
 
-- .NET 8 SDK, to build and run the projects — every project targets `net8.0`.
-- .NET SDK **9.0.200 or newer**, additionally, because the solution file is `PaymentGatewayCheckout.slnx`. The `.slnx` format is only understood by that SDK version onwards, so an older CLI fails at `dotnet restore` before anything is compiled. Installing both side by side is supported and is what CI does. To build without it, pass the project files directly instead of the solution.
-- Docker, if running the bank simulator locally.
+**Money is a `long` of minor units paired with a currency.** Never binary floating point, and never an amount without its currency attached.
 
-### Start the bank simulator
+**Time is injected.** Expiry rules take `TimeProvider`, so the expiry tests do not rot on a fixed date, and `CardDetails.IsExpired` is the single definition of expiry in the codebase — two definitions that drift apart would be a live payments defect.
 
-Run the simulator from the repository root with:
+**The code carries no comments.** Names, small methods, and named constants are expected to carry the meaning; explanation lives in this document instead. Test names read as the specification.
 
-```powershell
-docker-compose -f docker/docker-compose.yml up
-```
-
-The simulator should be available at `http://localhost:8080`.
-
-### Run the API
-
-```powershell
-dotnet restore .\PaymentGatewayCheckout.slnx
-dotnet run --project .\src\PaymentGateway.Api\PaymentGateway.Api.csproj
-```
-
-Swagger/OpenAPI is available in the Development environment only, at `/swagger`.
-
-### Run tests
-
-From the repository root:
-
-```powershell
-dotnet test .\PaymentGatewayCheckout.slnx
-```
-
-The build workflow runs the same command on Linux for every pull request, so the badge above reflects the suite independently of any one machine.
+**Assumptions made where the brief is silent:** a processed payment is `201` with a `Location` header rather than `200`; retrieval of an unknown id is `404` rather than an empty `200`; currency codes are matched case-insensitively but stored canonically uppercase; the `authorization_code` returned by the bank is not part of the documented response contract, so it is not stored or returned; and there is no pagination or listing endpoint, because the brief asks only for retrieval by id.
 
 ## Security and data handling
 
@@ -258,29 +302,47 @@ The build workflow runs the same command on Linux for every pull request, so the
 - Do not commit credentials, tokens, or secrets.
 - Treat a simulator timeout or `503` as a dependency failure, not as a decline.
 
+Implemented at the boundary: request body size capped at 4 KB, unknown JSON properties rejected rather than ignored, GUID route constraints so malformed ids never reach application code, HTTPS redirection with HSTS outside Development, the `Server` header removed, CORS closed by default, and Swagger served in Development only. Card masking happens in exactly one place — `CardDetails.FromCardNumber` — and nothing else in the codebase masks a card number.
+
+### There is no authentication, and no merchant identity
+
+This is the most important assumption in the solution, so it is stated plainly rather than left to be discovered.
+
+**Both endpoints are open to any caller that can reach the port.** There is no API key, no mTLS, no merchant identity anywhere in the pipeline: not on `ProcessPaymentCommand`, not on `Payment`, not in the repository lookup. Two consequences follow, and neither is acceptable in production:
+
+- `POST /payments` is a **card-testing oracle**. An attacker holding stolen card numbers can submit them and learn which are live from the `Authorized` versus `Declined` split, at the acquiring bank's expense. This is a routinely exploited attack against unauthenticated payment endpoints.
+- `GET /payments/{id}` performs **no ownership check**. Anyone holding a payment id can read that payment's status, last four digits, expiry, currency, and amount. The only obstacle is that a version 4 GUID is not guessable — obscurity, not authorization.
+
+The reason it is absent is scope, not oversight. The brief defines the merchant as an actor — "the seller of the product" — and never as data: it appears in neither the request table nor either response table, and the stated requirements are only that a merchant can process and retrieve a payment. The brief also asks for an architecture "focused on meeting the functional requirements" and explicitly discourages over-engineering.
+
+A partial version was considered and rejected. Threading an unauthenticated `MerchantId` through the command and onto the payment would enforce nothing while resembling an access control, which is worse than a documented absence — a field that looks like a security boundary and is not one invites exactly the wrong assumption.
+
+## What I would add next
+
+In the order I would do them, given more time:
+
+1. **Merchant authentication and per-merchant scoping.** An API key or mTLS scheme with constant-time comparison (`CryptographicOperations.FixedTimeEquals`), keys mapped to merchant identities, and secret storage with rotation. Then a merchant identifier threaded through the command, stored on the `Payment`, and applied to the retrieval query so one merchant receives `404` for another's payment. This closes both problems described above and is the only item on this list that is genuinely mandatory before production.
+2. **Idempotency keys on `POST /payments`.** The reason retry is disabled today is that a resubmission could double-charge. An idempotency key stored with the payment makes a repeat of the same request safe, which in turn makes a retry policy safe to enable.
+3. **Rate limiting**, using the built-in .NET 8 limiter, returning `429` with `Retry-After`. Per merchant once merchants exist; per IP before that. It also blunts the card-testing attack.
+4. **Durable storage.** The repository is already behind a port, so this is one new implementation plus a connection string, with the existing tests unchanged as the contract.
+5. **Tokenisation or provider-hosted fields**, so the raw card number never reaches this API at all. This is the change that removes most of the PCI surface rather than merely handling it carefully.
+6. **Structured log shipping and metrics** — authorization rate, decline rate, bank latency percentiles, circuit-breaker state transitions. The scopes and event ids are already in place for this; what is missing is somewhere to send them.
+7. **A payments listing endpoint with pagination**, once merchant scoping exists to make it safe.
+
 ## Scope boundaries
 
-The following are not required for this assessment:
+The following are deliberately not implemented:
 
 - A real database or durable distributed storage.
 - A live card-network or acquiring-bank integration.
 - Capture, refund, recurring billing, or other payment operations.
 - Webhooks, reconciliation jobs, message brokers, or an outbox.
-- A complete authentication or merchant identity platform.
+- Authentication, merchant identity, or a rate limiter.
 - Speculative abstractions and unrelated infrastructure.
-
-## Implementation roadmap
-
-- [x] Define the public request, response, and error contracts.
-- [x] Implement payment validation.
-- [x] Implement the configurable bank simulator client.
-- [ ] Map authorized, declined, and dependency-failure outcomes.
-- [ ] Add the in-memory payment repository and retrieval endpoint.
-- [ ] Add unit and integration tests.
-- [ ] Document supported currencies, assumptions, and HTTP status mappings.
 
 ## Related documentation
 
+- [Assessment brief](.github/instructions/README.md)
 - [Project scope](.github/project-context/project-scope.md)
 - [Architecture instructions](.github/instructions/architecture.instructions.md)
 - [Testing instructions](.github/instructions/testing.instructions.md)

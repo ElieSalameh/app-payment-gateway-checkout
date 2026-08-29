@@ -1,4 +1,4 @@
-@PaymentGateway.Api_HostAddress = http://localhost:5156
+@PaymentGateway.Api_HostAddress = https://localhost:55740
 
 ### Process a payment - card ending in an odd digit is authorized by the simulator
 POST {{PaymentGateway.Api_HostAddress}}/payments

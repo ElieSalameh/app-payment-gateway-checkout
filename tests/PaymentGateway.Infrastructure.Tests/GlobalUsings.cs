@@ -10,5 +10,6 @@ global using PaymentGateway.Domain.Shared;
 global using PaymentGateway.Infrastructure.Bank;
 global using PaymentGateway.Infrastructure.Persistence;
 global using PaymentGateway.Infrastructure.Tests.Bank;
+global using Polly.CircuitBreaker;
 global using Polly.Timeout;
 global using Xunit;

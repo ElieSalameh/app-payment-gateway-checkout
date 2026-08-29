@@ -48,6 +48,12 @@ public sealed class BankSimulatorClient : IAcquiringBankClient
 
             throw new AcquiringBankTimeoutException(exception);
         }
+        catch (BrokenCircuitException exception)
+        {
+            _logger.LogWarning("Acquiring bank calls are suspended by the open circuit, the payment was not sent");
+
+            throw new AcquiringBankUnavailableException(exception);
+        }
         catch (HttpRequestException exception)
         {
             _logger.LogWarning(exception, "Acquiring bank could not be reached, the payment outcome is unknown");
