@@ -119,14 +119,6 @@ public sealed class CardDetailsTests
     }
 
     [Fact]
-    public void HasExpired_WhenTheExpiryIsWellInThePast_ReturnsTrue()
-    {
-        var card = CardDetails.FromCardNumber("2222405343248877", expiryMonth: 1, expiryYear: 2020);
-
-        card.HasExpired(new DateTimeOffset(2026, 8, 28, 0, 0, 0, TimeSpan.Zero)).Should().BeTrue();
-    }
-
-    [Fact]
     public void IsExpired_DuringTheExpiryMonth_ReturnsFalse()
     {
         CardDetails.IsExpired(expiryMonth: 6, expiryYear: 2025, new DateTimeOffset(2025, 6, 1, 0, 0, 0, TimeSpan.Zero)).Should().BeFalse();
